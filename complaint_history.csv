@@ -1,0 +1,4 @@
+time,complaint,label,method,confidence,reply
+2025-11-26 11:29:39,i am received wrong product.,product,classifier,0.9764256281886631,Thanks for telling us — we understand. We'll review your product issue and provide a resolution as soon as possible.And ensure this will not happen again.
+2025-11-26 11:50:15,delivery boy behave very badly.,delivery,classifier,1.0,Thanks for telling us — we understand. We'll investigate the delivery problem and get back to you soon. And ensure this will not happen again.
+2025-11-26 11:51:00,My order bill is show extra 50 rupees.,billing,classifier,0.9106360092902839,Thanks for telling us — we understand. We'll check your billing issue and update you as soon as possible.
