@@ -11,18 +11,16 @@ import streamlit as st
 from sklearn.metrics.pairwise import cosine_similarity
 import altair as alt
 
-# -------------- Page config --------------
-st.set_page_config(
-    page_title="Complaint Auto-Responder",
-    layout="centered",
-)
+from pathlib import Path
 
-# -------------- Paths --------------
+BASE_DIR = Path(__file__).parent
 
-PIPELINE_PATH = "pipeline_calibrated.joblib"
-BANK_PATH = "complaint_bank.pkl"
-SBERT_META_PATH ="sbert_meta.joblib"
-BANK_EMB_PATH = "bank_embeddings.npy"
+PIPELINE_PATH = BASE_DIR / "pipeline_calibrated.joblib"
+BANK_PATH = BASE_DIR / "complaint_bank.pkl"
+SBERT_META_PATH = BASE_DIR / "sbert_meta.joblib"
+BANK_EMB_PATH = BASE_DIR / "bank_embeddings.npy"
+HISTORY_CSV = BASE_DIR / "complaint_history.csv"
+
 
 # history CSV path
 HISTORY_CSV = "complaint_history.csv"
@@ -372,4 +370,5 @@ else:
             st.dataframe(hist_df, use_container_width=True)
 
         st.markdown("</div>", unsafe_allow_html=True)
+
 
