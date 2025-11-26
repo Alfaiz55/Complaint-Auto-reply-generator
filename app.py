@@ -13,13 +13,16 @@ import altair as alt
 
 from pathlib import Path
 
+from pathlib import Path
+
 BASE_DIR = Path(__file__).parent
 
-PIPELINE_PATH = BASE_DIR / "pipeline_calibrated.joblib"
-BANK_PATH = BASE_DIR / "complaint_bank.pkl"
+PIPELINE_PATH   = BASE_DIR / "pipeline_calibrated.joblib"
+BANK_PATH       = BASE_DIR / "complaint_bank.pkl"
 SBERT_META_PATH = BASE_DIR / "sbert_meta.joblib"
-BANK_EMB_PATH = BASE_DIR / "bank_embeddings.npy"
-HISTORY_CSV = BASE_DIR / "complaint_history.csv"
+BANK_EMB_PATH   = BASE_DIR / "bank_embeddings.npy"
+HISTORY_CSV     = BASE_DIR / "complaint_history.csv"
+
 
 
 # history CSV path
@@ -370,5 +373,6 @@ else:
             st.dataframe(hist_df, use_container_width=True)
 
         st.markdown("</div>", unsafe_allow_html=True)
+
 
 
