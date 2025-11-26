@@ -18,14 +18,14 @@ st.set_page_config(
 )
 
 # -------------- Paths --------------
-ART_DIR = Path("complaint_artifacts")
-PIPELINE_PATH = ART_DIR / "pipeline_calibrated.joblib"
-BANK_PATH = ART_DIR / "complaint_bank.pkl"
-SBERT_META_PATH = ART_DIR / "sbert_meta.joblib"
-BANK_EMB_PATH = ART_DIR / "bank_embeddings.npy"
+
+PIPELINE_PATH = "pipeline_calibrated.joblib"
+BANK_PATH = "complaint_bank.pkl"
+SBERT_META_PATH ="sbert_meta.joblib"
+BANK_EMB_PATH = "bank_embeddings.npy"
 
 # history CSV path
-HISTORY_CSV = ART_DIR / "complaint_history.csv"
+HISTORY_CSV = "complaint_history.csv"
 
 # -------------- Light UI styling --------------
 st.markdown(
@@ -372,3 +372,4 @@ else:
             st.dataframe(hist_df, use_container_width=True)
 
         st.markdown("</div>", unsafe_allow_html=True)
+
