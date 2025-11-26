@@ -11,22 +11,20 @@ import streamlit as st
 from sklearn.metrics.pairwise import cosine_similarity
 import altair as alt
 
-from pathlib import Path
+# -------------- Page config --------------
+st.set_page_config(
+    page_title="Complaint Auto-Responder",
+    layout="centered",
+)
 
-from pathlib import Path
-
+# -------------- Paths --------------
 BASE_DIR = Path(__file__).parent
 
 PIPELINE_PATH   = BASE_DIR / "pipeline_calibrated.joblib"
 BANK_PATH       = BASE_DIR / "complaint_bank.pkl"
 SBERT_META_PATH = BASE_DIR / "sbert_meta.joblib"
-BANK_EMB_PATH   = BASE_DIR / "bank_embeddings.npy"
-HISTORY_CSV     = BASE_DIR / "complaint_history.csv"
-
-
-
-# history CSV path
-HISTORY_CSV = "complaint_history.csv"
+BANK_EMB_PATH   = BASE_DIR / "bank_embeddings.npy"      # if this file is missing, retrieval will be skipped
+HISTORY_CSV     = BASE_DIR / "complaint_history.csv"    # IMPORTANT: Path, not string
 
 # -------------- Light UI styling --------------
 st.markdown(
@@ -196,10 +194,10 @@ def get_reply(text: str, sim_threshold: float = 0.65):
     final_label = rule_override_label(text, pred, conf)
 
     default_replies = {
-        "billing": "Thanks for telling us — we understand. We'll check your billing issue and update you as soon as possible.",
-        "delivery": "Thanks for telling us — we understand. We'll investigate the delivery problem and get back to you soon. And ensure this will not happen again.",
-        "product": "Thanks for telling us — we understand. We'll review your product issue and provide a resolution as soon as possible.And ensure this will not happen again.",
-        "account": "Thanks for telling us — we understand. We'll solving your account problem and share an update as soon as possible. Also with proper mail and notification by system",
+        "billing":   "Thanks for telling us — we understand. We'll check your billing issue and update you as soon as possible.",
+        "delivery":  "Thanks for telling us — we understand. We'll investigate the delivery problem and get back to you soon. And ensure this will not happen again.",
+        "product":   "Thanks for telling us — we understand. We'll review your product issue and provide a resolution as soon as possible.And ensure this will not happen again.",
+        "account":   "Thanks for telling us — we understand. We'll solving your account problem and share an update as soon as possible. Also with proper mail and notification by system",
         "technical": "Thanks for telling us — we understand. Our technical team will check this issue and we'll update you as soon as possible.",
     }
 
@@ -373,6 +371,3 @@ else:
             st.dataframe(hist_df, use_container_width=True)
 
         st.markdown("</div>", unsafe_allow_html=True)
-
-
-
