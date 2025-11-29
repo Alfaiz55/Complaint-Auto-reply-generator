@@ -1,4 +1,4 @@
-# app.py – Clean complaint UI with User/Admin panels, dashboard, history, rules + CSV persistence
+# app.py – Complaint Auto-Responder with User/Admin panels, rules, CSV persistence, extra info field
 
 import time
 from pathlib import Path
@@ -23,8 +23,8 @@ BASE_DIR = Path(__file__).parent
 PIPELINE_PATH   = BASE_DIR / "pipeline_calibrated.joblib"
 BANK_PATH       = BASE_DIR / "complaint_bank.pkl"
 SBERT_META_PATH = BASE_DIR / "sbert_meta.joblib"
-BANK_EMB_PATH   = BASE_DIR / "bank_embeddings.npy"      # if this file is missing, retrieval will be skipped
-HISTORY_CSV     = BASE_DIR / "complaint_history.csv"    # IMPORTANT: Path, not string
+BANK_EMB_PATH   = BASE_DIR / "bank_embeddings.npy"      # if missing, retrieval will be skipped
+HISTORY_CSV     = BASE_DIR / "complaint_history.csv"    # Path
 
 # -------------- Light UI styling --------------
 st.markdown(
@@ -149,6 +149,8 @@ LABEL_KEYWORDS = {
     ],
 }
 
+ALL_LABELS = ["billing", "delivery", "product", "account", "technical"]
+
 def rule_override_label(text: str, model_label: str, conf: Optional[float]) -> str:
     t = text.lower()
     hits = {label: 0 for label in LABEL_KEYWORDS.keys()}
@@ -222,6 +224,18 @@ if "history" not in st.session_state:
     else:
         st.session_state["history"] = []
 
+# pending state for 2-step submission (prediction → extra info → save)
+if "pending_result" not in st.session_state:
+    st.session_state["pending_result"] = None
+if "pending_complaint" not in st.session_state:
+    st.session_state["pending_complaint"] = ""
+if "pending_time" not in st.session_state:
+    st.session_state["pending_time"] = ""
+if "pending_elapsed" not in st.session_state:
+    st.session_state["pending_elapsed"] = 0.0
+if "extra_info" not in st.session_state:
+    st.session_state["extra_info"] = ""
+
 # -------------- Sidebar --------------
 mode = st.sidebar.radio("View as", ["User panel", "Admin panel"], index=0)
 
@@ -247,10 +261,12 @@ if mode == "User panel":
             "Enter the complaint",
             height=150,
             placeholder="Example: The delivery boy asked me to come to the office to take the product. He did not come to my home for delivery.",
+            key="complaint_input",
         )
 
         submit = st.button("Submit", type="primary")
 
+        # Step 1: prediction
         if submit:
             if not complaint.strip():
                 st.warning("Please enter a complaint before submitting.")
@@ -262,45 +278,105 @@ if mode == "User panel":
 
                 if result.get("method") == "error":
                     st.error(result.get("message"))
+                    st.session_state["pending_result"] = None
                 else:
-                    label = result.get("label", "unknown")
-                    reply_text = result.get("reply", "")
+                    # store pending info to complete after extra field
+                    st.session_state["pending_result"] = result
+                    st.session_state["pending_complaint"] = complaint.strip()
+                    st.session_state["pending_time"] = time.strftime("%Y-%m-%d %H:%M:%S")
+                    st.session_state["pending_elapsed"] = elapsed
+                    st.session_state["extra_info"] = ""  # reset
 
+        # Step 2: show reply + required extra textbox + save button
+        pending = st.session_state.get("pending_result")
+        if pending is not None:
+            label = pending.get("label", "unknown")
+            reply_text = pending.get("reply", "")
+            elapsed = st.session_state.get("pending_elapsed", 0.0)
+
+            st.markdown("<div class='section-title'>Suggested response</div>", unsafe_allow_html=True)
+            display_text = f"We received your complaint related to **{label}** :-<br>{reply_text}"
+            st.markdown(f"<div class='reply-box'>{display_text}</div>", unsafe_allow_html=True)
+
+            meta = []
+            if pending.get("method"):
+                meta.append(f"Method: `{pending['method']}`")
+            if pending.get("confidence") is not None:
+                meta.append(f"Confidence: `{pending['confidence']:.2f}`")
+            meta.append(f"Generated in {elapsed:.2f}s")
+
+            st.markdown(
+                "<div class='meta-text'>" + " • ".join(meta) + "</div>",
+                unsafe_allow_html=True,
+            )
+
+            # choose label-specific extra field
+            if label in ("product", "delivery"):
+                extra_label = "Enter your Order ID"
+                extra_placeholder = "Example: ORD-123456"
+            elif label == "billing":
+                extra_label = "Enter your Billing / Transaction ID"
+                extra_placeholder = "Example: TXN-987654321"
+            elif label == "account":
+                extra_label = "Enter your Username or registered email"
+                extra_placeholder = "Example: user123 or name@gmail.com"
+            elif label == "technical":
+                extra_label = "Enter your Device / App details"
+                extra_placeholder = "Example: Phone model, Android version, App version"
+            else:
+                extra_label = "Enter related details"
+                extra_placeholder = "Example: useful reference for this complaint"
+
+            st.markdown("<div class='section-title'>Additional required details</div>", unsafe_allow_html=True)
+            extra_val = st.text_input(
+                extra_label,
+                value=st.session_state.get("extra_info", ""),
+                placeholder=extra_placeholder,
+                key="extra_info_input",
+            )
+
+            # Keep in session so we can validate on button click
+            st.session_state["extra_info"] = extra_val
+
+            save_btn = st.button("Save complaint")
+
+            if save_btn:
+                if not extra_val.strip():
+                    st.warning("Please fill the required details before saving.")
+                else:
+                    # build record and persist
                     record = {
-                        "time": time.strftime("%Y-%m-%d %H:%M:%S"),
-                        "complaint": complaint.strip(),
+                        "time": st.session_state.get("pending_time"),
+                        "complaint": st.session_state.get("pending_complaint"),
                         "label": label,
-                        "method": result.get("method"),
-                        "confidence": result.get("confidence"),
+                        "method": pending.get("method"),
+                        "confidence": pending.get("confidence"),
                         "reply": reply_text,
+                        "extra_info": extra_val.strip(),
                     }
 
                     # Save to session
                     st.session_state["history"].append(record)
 
-                    # Save to CSV (append, keep all past entries)
+                    # Save to CSV
                     df_new = pd.DataFrame([record])
                     if HISTORY_CSV.exists():
                         df_new.to_csv(HISTORY_CSV, mode="a", index=False, header=False)
                     else:
                         df_new.to_csv(HISTORY_CSV, mode="w", index=False, header=True)
 
-                    # Show reply
-                    st.markdown("<div class='section-title'>Suggested response</div>", unsafe_allow_html=True)
-                    display_text = f"We received your complaint related to **{label}** :-<br>{reply_text}"
-                    st.markdown(f"<div class='reply-box'>{display_text}</div>", unsafe_allow_html=True)
-
-                    meta = []
-                    if result.get("method"):
-                        meta.append(f"Method: `{result['method']}`")
-                    if result.get("confidence") is not None:
-                        meta.append(f"Confidence: `{result['confidence']:.2f}`")
-                    meta.append(f"Generated in {elapsed:.2f}s")
-
-                    st.markdown(
-                        "<div class='meta-text'>" + " • ".join(meta) + "</div>",
-                        unsafe_allow_html=True,
+                    st.success(
+                        "Your complaint and additional details have been saved. "
+                        "We appreciate your patience and will get back to you shortly."
                     )
+
+                    # clear pending state
+                    st.session_state["pending_result"] = None
+                    st.session_state["pending_complaint"] = ""
+                    st.session_state["pending_time"] = ""
+                    st.session_state["pending_elapsed"] = 0.0
+                    st.session_state["extra_info"] = ""
+                    st.session_state["extra_info_input"] = ""
 
         st.markdown("</div>", unsafe_allow_html=True)
 
@@ -321,52 +397,73 @@ else:
         else:
             df = pd.DataFrame(history)
 
-            st.markdown("<div class='section-title'>Complaint Dashboard</div>", unsafe_allow_html=True)
+            # ensure extra_info column exists for old CSVs
+            if "extra_info" not in df.columns:
+                df["extra_info"] = ""
 
+            st.markdown("<div class='section-title'>Complaint Dashboard</div>", unsafe_allow_html=True)
             st.write(f"Total complaints processed: **{len(df)}**")
 
-            # Label counts + percentage
-            label_counts = df["label"].value_counts().reset_index()
-            label_counts.columns = ["label", "count"]
-            label_counts["percentage"] = (
-                label_counts["count"] / label_counts["count"].sum() * 100
-            ).round(2)
+            # build full counts including zero for missing labels
+            counts = df["label"].value_counts()
+            label_counts = pd.DataFrame({"label": ALL_LABELS})
+            label_counts["count"] = label_counts["label"].map(counts).fillna(0).astype(int)
+            total = label_counts["count"].sum()
+            if total > 0:
+                label_counts["percentage"] = (label_counts["count"] / total * 100).round(2)
+            else:
+                label_counts["percentage"] = 0.0
 
-            # Show table with index starting from 1
+            # Show all labels table (index starting from 1)
             label_counts_display = label_counts.copy()
             label_counts_display.index = label_counts_display.index + 1
             st.dataframe(label_counts_display, use_container_width=True)
 
-            # Pie chart with legend on left + percentage labels
-            if len(label_counts) > 0:
-                base = (
-                    alt.Chart(label_counts)
-                    .encode(
-                        theta=alt.Theta("count:Q", stack=True),
-                        color=alt.Color(
-                            "label:N",
-                            legend=alt.Legend(title="Labels", orient="left"),
-                        ),
-                        tooltip=[
-                            alt.Tooltip("label:N", title="Label"),
-                            alt.Tooltip("count:Q", title="Count"),
-                            alt.Tooltip("percentage:Q", title="Percentage", format=".2f"),
-                        ],
+            # Pie + labels list
+            st.markdown("### Complaint categories & distribution")
+
+            col_left, col_right = st.columns([1, 2])
+
+            with col_left:
+                st.markdown("**All complaint categories:**")
+                for lbl in ALL_LABELS:
+                    st.markdown(f"- {lbl.capitalize()}")
+
+            with col_right:
+                pie_data = label_counts[label_counts["count"] > 0]
+                if len(pie_data) > 0:
+                    base = (
+                        alt.Chart(pie_data)
+                        .encode(
+                            theta=alt.Theta("count:Q", stack=True),
+                            color=alt.Color(
+                                "label:N",
+                                legend=alt.Legend(title="Labels"),
+                            ),
+                            tooltip=[
+                                alt.Tooltip("label:N", title="Label"),
+                                alt.Tooltip("count:Q", title="Count"),
+                                alt.Tooltip(
+                                    "percentage:Q", title="Percentage", format=".2f"
+                                ),
+                            ],
+                        )
                     )
-                )
 
-                pie = base.mark_arc()
-                text = base.mark_text(radius=110).encode(
-                    text=alt.Text("percentage:Q", format=".0f")
-                )
+                    pie = base.mark_arc()
+                    text = base.mark_text(radius=110).encode(
+                        text=alt.Text("percentage:Q", format=".0f")
+                    )
 
-                chart = (pie + text).properties(height=250)
-                st.altair_chart(chart, use_container_width=True)
+                    chart = (pie + text).properties(height=250)
+                    st.altair_chart(chart, use_container_width=True)
+                else:
+                    st.info("No data yet for pie chart.")
 
             st.markdown("<div class='section-title'>Complaint History</div>", unsafe_allow_html=True)
 
-            # History table with index starting from 1
-            hist_df = df[["time", "complaint", "label", "method", "confidence"]].copy()
+            # History table with index starting from 1, including extra_info
+            hist_df = df[["time", "complaint", "label", "method", "confidence", "extra_info"]].copy()
             hist_df.index = hist_df.index + 1
             st.dataframe(hist_df, use_container_width=True)
 
