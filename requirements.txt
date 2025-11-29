@@ -4,3 +4,4 @@ joblib
 numpy
 sentence-transformers
 faiss-cpu
+pandas
