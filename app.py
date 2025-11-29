@@ -376,7 +376,6 @@ if mode == "User panel":
                     st.session_state["pending_time"] = ""
                     st.session_state["pending_elapsed"] = 0.0
                     st.session_state["extra_info"] = ""
-                    st.session_state["extra_info_input"] = ""
 
         st.markdown("</div>", unsafe_allow_html=True)
 
