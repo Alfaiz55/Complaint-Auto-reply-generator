@@ -1,9 +1,7 @@
-# app.py – Complaint Auto Reply Generator (FINAL STABLE VERSION)
+# app.py – Complaint Auto Reply Generator (STABLE FINAL)
 
 import time
 from pathlib import Path
-from typing import Optional, Dict, List
-
 import joblib
 import numpy as np
 import pandas as pd
@@ -20,7 +18,7 @@ st.set_page_config(
 )
 
 # --------------------------------------------------
-# Paths (Cloud-safe)
+# Paths (Streamlit Cloud safe)
 # --------------------------------------------------
 BASE_DIR = Path(__file__).parent
 PIPELINE_PATH = BASE_DIR / "pipeline_calibrated.joblib"
@@ -42,9 +40,21 @@ st.markdown(
         border-radius: 12px;
         box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
     }
-    .main-title { font-size: 28px; font-weight: 700; color: #0f172a; }
-    .subtitle { color: #6b7280; font-size: 14px; margin-bottom: 18px; }
-    .section-title { font-size: 18px; font-weight: 600; color: #111827; }
+    .main-title {
+        font-size: 28px;
+        font-weight: 700;
+        color: #0f172a;
+    }
+    .subtitle {
+        color: #6b7280;
+        font-size: 14px;
+        margin-bottom: 18px;
+    }
+    .section-title {
+        font-size: 18px;
+        font-weight: 600;
+        color: #111827;
+    }
     .reply-box {
         background: #e0f2fe;
         border: 1px solid #93c5fd;
@@ -59,38 +69,53 @@ st.markdown(
 )
 
 # --------------------------------------------------
-# Session state init
+# Session State Init
 # --------------------------------------------------
 if "role" not in st.session_state:
     st.session_state.role = None
+
 if "admin_logged" not in st.session_state:
     st.session_state.admin_logged = False
+
 if "history" not in st.session_state:
     if HISTORY_CSV.exists():
         try:
             st.session_state.history = pd.read_csv(HISTORY_CSV).to_dict("records")
-        except:
+        except Exception:
             st.session_state.history = []
     else:
         st.session_state.history = []
 
 # --------------------------------------------------
-# Loaders
+# Loaders (SAFE)
 # --------------------------------------------------
 @st.cache_resource(show_spinner=False)
 def load_pipeline():
-    return joblib.load(PIPELINE_PATH) if PIPELINE_PATH.exists() else None
+    if not PIPELINE_PATH.exists():
+        return None
+    try:
+        model = joblib.load(PIPELINE_PATH)
+        if hasattr(model, "predict"):
+            return model
+        return None
+    except Exception:
+        return None
 
 @st.cache_resource(show_spinner=False)
 def load_bank():
-    return joblib.load(BANK_PATH) if BANK_PATH.exists() else None
+    if not BANK_PATH.exists():
+        return None
+    try:
+        return joblib.load(BANK_PATH)
+    except Exception:
+        return None
 
 @st.cache_resource(show_spinner=False)
 def load_sbert():
     try:
         from sentence_transformers import SentenceTransformer
         return SentenceTransformer("all-MiniLM-L6-v2")
-    except:
+    except Exception:
         return None
 
 pipeline = load_pipeline()
@@ -99,34 +124,54 @@ sbert = load_sbert()
 bank_embs = np.load(BANK_EMB_PATH) if BANK_EMB_PATH.exists() else None
 
 # --------------------------------------------------
-# Prediction logic (UNCHANGED)
+# Core Prediction Logic (CRASH-PROOF)
 # --------------------------------------------------
 def get_reply(text: str):
+    if pipeline is None:
+        return (
+            "system",
+            "The system is temporarily unavailable. Please try again later.",
+            0.0,
+        )
+
+    # Retrieval path
     if sbert and bank and bank_embs is not None:
         q = sbert.encode([text], convert_to_numpy=True)
         sims = cosine_similarity(q, bank_embs)[0]
         idx = int(np.argmax(sims))
         if sims[idx] >= 0.65:
-            return bank[idx]["label"], bank[idx]["reply"], sims[idx]
+            return bank[idx]["label"], bank[idx]["reply"], float(sims[idx])
 
+    # Classifier path
     pred = pipeline.predict([text])[0]
-    conf = float(np.max(pipeline.predict_proba([text])[0]))
-    default_reply = f"Thanks for telling us — we understand. We’ll handle your {pred} issue shortly."
-    return pred, default_reply, conf
+    try:
+        conf = float(np.max(pipeline.predict_proba([text])[0]))
+    except Exception:
+        conf = 0.0
+
+    reply = (
+        f"Thanks for telling us — we understand. "
+        f"We will review your {pred} issue and get back to you shortly."
+    )
+
+    return pred, reply, conf
 
 # --------------------------------------------------
-# PAGE 1: ROLE SELECTION
+# ROLE SELECTION PAGE
 # --------------------------------------------------
 if st.session_state.role is None:
     st.markdown("<h2 style='text-align:center'>Complaint Auto Reply Generator</h2>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align:center;color:#555'>Quick complaint handling with intelligent automation</p>", unsafe_allow_html=True)
+    st.markdown(
+        "<p style='text-align:center;color:#555'>Quick complaint handling with intelligent services</p>",
+        unsafe_allow_html=True,
+    )
 
-    col1, col2 = st.columns(2)
-    with col1:
+    c1, c2 = st.columns(2)
+    with c1:
         if st.button("User", use_container_width=True):
             st.session_state.role = "user"
             st.rerun()
-    with col2:
+    with c2:
         if st.button("Admin", use_container_width=True):
             st.session_state.role = "admin"
             st.rerun()
@@ -146,7 +191,7 @@ elif st.session_state.role == "admin" and not st.session_state.admin_logged:
             st.error("Invalid credentials")
 
 # --------------------------------------------------
-# USER PANEL (UNCHANGED UI)
+# USER PANEL (UNCHANGED DESIGN)
 # --------------------------------------------------
 elif st.session_state.role == "user":
     st.markdown("<div class='main-card'>", unsafe_allow_html=True)
@@ -159,17 +204,18 @@ elif st.session_state.role == "user":
     )
 
     if st.button("Submit", type="primary"):
-        label, reply, conf = get_reply(complaint)
+        label, reply, conf = get_reply(complaint.strip())
 
         record = {
             "time": time.strftime("%Y-%m-%d %H:%M:%S"),
-            "complaint": complaint,
+            "complaint": complaint.strip(),
             "label": label,
             "confidence": conf,
             "reply": reply,
         }
 
         st.session_state.history.append(record)
+
         pd.DataFrame([record]).to_csv(
             HISTORY_CSV,
             mode="a",
@@ -177,19 +223,22 @@ elif st.session_state.role == "user":
             header=not HISTORY_CSV.exists(),
         )
 
-        st.markdown(f"<div class='reply-box'><b>{label}</b>: {reply}</div>", unsafe_allow_html=True)
+        st.markdown(
+            f"<div class='reply-box'><b>{label}</b>: {reply}</div>",
+            unsafe_allow_html=True,
+        )
 
     st.markdown("</div>", unsafe_allow_html=True)
 
 # --------------------------------------------------
-# ADMIN PANEL (UNCHANGED UI + CSV DOWNLOAD)
+# ADMIN PANEL (UNCHANGED DESIGN)
 # --------------------------------------------------
 elif st.session_state.role == "admin" and st.session_state.admin_logged:
     st.markdown("<div class='main-card'>", unsafe_allow_html=True)
     st.markdown("<div class='main-title'>Admin Panel</div>", unsafe_allow_html=True)
 
     df = pd.DataFrame(st.session_state.history)
-    st.write(f"Total complaints: {len(df)}")
+    st.write(f"Total complaints processed: **{len(df)}**")
 
     if not df.empty:
         counts = df["label"].value_counts().reset_index()
@@ -198,7 +247,7 @@ elif st.session_state.role == "admin" and st.session_state.admin_logged:
         chart = alt.Chart(counts).mark_arc().encode(
             theta="count",
             color="label",
-            tooltip=["label", "count"]
+            tooltip=["label", "count"],
         )
         st.altair_chart(chart, use_container_width=True)
 
