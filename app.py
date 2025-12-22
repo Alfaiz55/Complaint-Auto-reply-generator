@@ -1,4 +1,4 @@
-# app.py – Complaint Auto Reply Generator (FINAL STABLE VERSION)
+# app.py – Complaint Auto Reply Generator (FINAL STABLE & FIXED VERSION)
 
 import time
 from pathlib import Path
@@ -16,12 +16,12 @@ st.set_page_config(
     layout="centered",
 )
 
-# ---------------- Paths (GitHub-safe) ----------------
+# ---------------- Paths ----------------
 BASE_DIR = Path(__file__).parent
 PIPELINE_PATH = BASE_DIR / "pipeline_calibrated.joblib"
 HISTORY_CSV = BASE_DIR / "complaint_history.csv"
 
-# ---------------- UI Styling (UNCHANGED) ----------------
+# ---------------- UI Styling ----------------
 st.markdown(
     """
     <style>
@@ -35,7 +35,6 @@ st.markdown(
     .main-title {
         font-size: 28px;
         font-weight: 700;
-        margin-bottom: 4px;
         color: #0f172a;
     }
     .subtitle {
@@ -46,9 +45,8 @@ st.markdown(
     .section-title {
         font-size: 18px;
         font-weight: 600;
-        margin-top: 12px;
-        margin-bottom: 6px;
         color: #111827;
+        margin-top: 12px;
     }
     .reply-box {
         background: #e0f2fe;
@@ -57,34 +55,20 @@ st.markdown(
         padding: 14px;
         border-radius: 8px;
         font-size: 15px;
-        line-height: 1.5;
         margin-top: 8px;
-    }
-    .meta-text {
-        color: #6b7280;
-        font-size: 13px;
-        margin-top: 6px;
-    }
-    /* Hover effect for Submit Complaint */
-    button:has(span:contains("Submit Complaint")):hover {
-        background-color: #dc2626 !important;
-        border-color: #dc2626 !important;
-        color: white !important;
     }
     </style>
     """,
     unsafe_allow_html=True,
 )
 
-# ---------------- Load ML Pipeline ----------------
+# ---------------- Load Model ----------------
 @st.cache_resource(show_spinner=False)
 def load_pipeline(path: Path):
     if not path.exists():
         return None
     obj = joblib.load(path)
-    if isinstance(obj, dict) and "pipeline" in obj:
-        return obj["pipeline"]
-    return obj
+    return obj["pipeline"] if isinstance(obj, dict) and "pipeline" in obj else obj
 
 pipeline = load_pipeline(PIPELINE_PATH)
 
@@ -92,39 +76,31 @@ pipeline = load_pipeline(PIPELINE_PATH)
 ALL_LABELS = ["billing", "delivery", "product", "account", "technical"]
 
 LABEL_KEYWORDS = {
-    "delivery": ["delivery", "courier", "parcel", "not delivered", "late"],
-    "billing": ["refund", "billing", "charged", "payment", "invoice"],
+    "delivery": ["delivery", "courier", "parcel", "late"],
+    "billing": ["refund", "billing", "charged", "payment"],
     "product": ["damaged", "broken", "defective", "wrong"],
-    "account": ["login", "password", "otp", "account"],
+    "account": ["login", "password", "otp"],
     "technical": ["app", "error", "crash", "bug"],
 }
 
 def rule_override_label(text: str, model_label: str, conf: Optional[float]):
-    text = text.lower()
     scores = {k: 0 for k in ALL_LABELS}
+    text = text.lower()
     for label, words in LABEL_KEYWORDS.items():
         for w in words:
             if w in text:
                 scores[label] += 1
     best = max(scores, key=scores.get)
-    if scores[best] == 0:
-        return model_label
-    if conf is not None and conf >= 0.80:
+    if scores[best] == 0 or (conf and conf >= 0.80):
         return model_label
     return best
 
-# ---------------- Inference (FIXED) ----------------
+# ---------------- Inference ----------------
 def get_reply(text: str):
     if pipeline is None:
-        return {
-            "method": "error",
-            "label": "unknown",
-            "reply": "Model not loaded correctly.",
-            "confidence": None,
-        }
+        return {"error": True, "reply": "Model not loaded correctly."}
 
     pred = pipeline.predict([text])[0]
-
     try:
         conf = float(np.max(pipeline.predict_proba([text])[0]))
     except Exception:
@@ -133,17 +109,17 @@ def get_reply(text: str):
     label = rule_override_label(text, pred, conf)
 
     replies = {
-        "billing": "Thanks for telling us — we understand. We'll check your billing issue and update you soon.",
-        "delivery": "Thanks for telling us — we understand. We'll investigate the delivery issue and update you soon.",
-        "product": "Thanks for telling us — we understand. We'll review the product issue and resolve it shortly.",
-        "account": "Thanks for telling us — we understand. We'll assist you with your account issue shortly.",
-        "technical": "Thanks for telling us — we understand. Our technical team will look into this issue.",
+        "billing": "We will review your billing issue and update you shortly.",
+        "delivery": "We are checking the delivery issue and will resolve it soon.",
+        "product": "We will review the product issue and assist you.",
+        "account": "We will help you resolve your account issue.",
+        "technical": "Our technical team will look into this issue.",
     }
 
     return {
-        "method": "classifier",
+        "error": False,
         "label": label,
-        "reply": replies.get(label),
+        "reply": replies.get(label, "We will review your issue."),
         "confidence": conf,
     }
 
@@ -155,7 +131,7 @@ if "history" not in st.session_state:
         st.session_state.history = []
 
 # ---------------- Sidebar ----------------
-mode = st.sidebar.radio("View as", ["User panel", "Admin panel"], index=0)
+mode = st.sidebar.radio("View as", ["User panel", "Admin panel"])
 
 # ================= USER PANEL =================
 if mode == "User panel":
@@ -163,67 +139,59 @@ if mode == "User panel":
         st.markdown("<div class='main-card'>", unsafe_allow_html=True)
 
         st.markdown("<div class='main-title'>Complaint Auto Reply Generator</div>", unsafe_allow_html=True)
-        st.markdown(
-            "<div class='subtitle'>Enter your complaint. We will provide a quick and helpful response.</div>",
-            unsafe_allow_html=True,
-        )
-
-        st.markdown("<div class='section-title'>Enter the complaint</div>", unsafe_allow_html=True)
+        st.markdown("<div class='subtitle'>Submit your complaint and get quick assistance.</div>", unsafe_allow_html=True)
 
         complaint = st.text_area(
-            "Complaint",
+            "Enter your complaint",
             height=150,
-            placeholder="Example: The delivery boy asked me to collect the product from office."
+            placeholder="Example: The delivery boy asked me to collect the product from office.",
         )
 
         if st.button("Submit", type="primary"):
             if not complaint.strip():
                 st.warning("Please enter a complaint.")
             else:
-                result = get_reply(complaint.strip())
+                st.session_state.result = get_reply(complaint.strip())
+                st.session_state.complaint_text = complaint.strip()
 
-                if result["method"] == "error":
-                    st.error(result["reply"])
+        if "result" in st.session_state and not st.session_state.result["error"]:
+            r = st.session_state.result
+
+            st.markdown("<div class='section-title'>Suggested response</div>", unsafe_allow_html=True)
+            st.markdown(
+                f"<div class='reply-box'>Complaint category: <b>{r['label']}</b><br>{r['reply']}</div>",
+                unsafe_allow_html=True,
+            )
+
+            placeholders = {
+                "billing": "e.g. BILL-2024-1098",
+                "product": "e.g. ORD-458921",
+                "delivery": "e.g. TRK-992134",
+                "account": "e.g. registered email",
+                "technical": "e.g. Android 13, App v2.4.1",
+            }
+
+            extra_info = st.text_input(
+                "Additional information (required)",
+                placeholder=placeholders[r["label"]],
+            )
+
+            if st.button("Submit Complaint"):
+                if not extra_info.strip():
+                    st.warning("Please provide the required information.")
                 else:
-                    st.markdown("<div class='section-title'>Suggested response</div>", unsafe_allow_html=True)
-                    st.markdown(
-                        f"<div class='reply-box'>We received your complaint related to "
-                        f"<b>{result['label']}</b> :-<br>{result['reply']}</div>",
-                        unsafe_allow_html=True,
-                    )
-
-                    # -------- Additional Info Box --------
-                    extra_placeholders = {
-                        "billing": "e.g. Billing ID: BILL-2024-1098",
-                        "product": "e.g. Order ID: ORD-458921",
-                        "delivery": "e.g. Tracking ID: TRK-992134",
-                        "account": "e.g. Registered email or username",
-                        "technical": "e.g. Android 13, App version 2.4.1",
+                    record = {
+                        "time": time.strftime("%Y-%m-%d %H:%M:%S"),
+                        "complaint": st.session_state.complaint_text,
+                        "label": r["label"],
+                        "confidence": r["confidence"],
+                        "extra_info": extra_info,
                     }
+                    st.session_state.history.append(record)
+                    pd.DataFrame(st.session_state.history).to_csv(HISTORY_CSV, index=False)
 
-                    extra_info = st.text_input(
-                        "Additional information (required)",
-                        placeholder=extra_placeholders.get(
-                            result["label"], "Enter relevant reference details"
-                        )
-                    )
-
-                    if st.button("Submit Complaint", type="primary"):
-                        record = {
-                            "time": time.strftime("%Y-%m-%d %H:%M:%S"),
-                            "complaint": complaint.strip(),
-                            "label": result["label"],
-                            "confidence": result["confidence"],
-                            "extra_info": extra_info,
-                        }
-
-                        st.session_state.history.append(record)
-                        pd.DataFrame(st.session_state.history).to_csv(HISTORY_CSV, index=False)
-
-                        st.success(
-                            "Thank you for submitting your complaint. "
-                            "Our team will review the details and resolve your issue as soon as possible."
-                        )
+                    st.success("Thank you. Your complaint has been registered successfully.")
+                    del st.session_state.result
 
         st.markdown("</div>", unsafe_allow_html=True)
 
@@ -234,16 +202,11 @@ else:
         st.markdown("<div class='main-title'>Admin Panel</div>", unsafe_allow_html=True)
 
         if not st.session_state.history:
-            st.info("No complaints processed yet.")
+            st.info("No complaints yet.")
         else:
             df = pd.DataFrame(st.session_state.history)
 
-            counts = (
-                df["label"]
-                .value_counts()
-                .reindex(ALL_LABELS, fill_value=0)
-                .reset_index()
-            )
+            counts = df["label"].value_counts().reindex(ALL_LABELS, fill_value=0).reset_index()
             counts.columns = ["label", "count"]
             counts["percentage"] = (counts["count"] / counts["count"].sum() * 100).round(1)
 
@@ -252,7 +215,6 @@ else:
                 color="label",
                 tooltip=["label", "count", "percentage"],
             )
-
             st.altair_chart(chart, width="stretch")
             st.dataframe(df, width="stretch")
 
