@@ -1,4 +1,4 @@
-# app.py – Complaint Auto Reply Generator (FINAL STABLE & FIXED VERSION)
+# app.py – Complaint Auto Reply Generator (FINAL STABLE & CORRECTED VERSION)
 
 import time
 from pathlib import Path
@@ -91,7 +91,7 @@ def rule_override_label(text: str, model_label: str, conf: Optional[float]):
             if w in text:
                 scores[label] += 1
     best = max(scores, key=scores.get)
-    if scores[best] == 0 or (conf and conf >= 0.80):
+    if scores[best] == 0 or (conf is not None and conf >= 0.80):
         return model_label
     return best
 
@@ -185,8 +185,10 @@ if mode == "User panel":
                         "complaint": st.session_state.complaint_text,
                         "label": r["label"],
                         "confidence": r["confidence"],
+                        "reply": r["reply"],          # ✅ FIXED: reply is now saved
                         "extra_info": extra_info,
                     }
+
                     st.session_state.history.append(record)
                     pd.DataFrame(st.session_state.history).to_csv(HISTORY_CSV, index=False)
 
@@ -215,6 +217,7 @@ else:
                 color="label",
                 tooltip=["label", "count", "percentage"],
             )
+
             st.altair_chart(chart, width="stretch")
             st.dataframe(df, width="stretch")
 
