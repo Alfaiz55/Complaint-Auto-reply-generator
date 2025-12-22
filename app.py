@@ -152,8 +152,7 @@ if mode == "User panel":
         st.markdown("<div class='main-card'>", unsafe_allow_html=True)
         st.markdown("<div class='main-title'>Complaint Auto Reply Generator</div>", unsafe_allow_html=True)
         st.markdown("<div class='subtitle'>Enter your complaint.</div>", unsafe_allow_html=True)
-        # -------- Additional Info Box (category-wise) --------
-extra_placeholders = {
+        extra_placeholders = {
     "billing": "e.g. Billing ID: BILL-2024-1098",
     "product": "e.g. Order ID: ORD-458921",
     "delivery": "e.g. Tracking ID: TRK-992134",
@@ -168,6 +167,8 @@ extra_info = st.text_input(
         "Enter relevant reference details"
     )
 )
+        # -------- Additional Info Box (category-wise) --------
+
 
 
         complaint = st.text_area("Complaint", height=150)
