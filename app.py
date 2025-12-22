@@ -219,10 +219,11 @@ else:
             )
 
             st.altair_chart(chart, width="stretch")
-            df_display = df.copy()
+            df_display = df.copy().reset_index(drop=True)
             df_display.insert(0, "S.No", range(1, len(df_display) + 1))
 
-            st.dataframe(df_display, width="stretch")
+            st.dataframe(df_display, width="stretch", hide_index=True)
 
         st.markdown("</div>", unsafe_allow_html=True)
+
 
