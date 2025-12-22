@@ -65,6 +65,12 @@ st.markdown(
         font-size: 13px;
         margin-top: 6px;
     }
+     /* Target only the "Submit Complaint" button */
+    button:has(span:contains("Submit Complaint")):hover {
+        background-color: #dc2626 !important; /* red */
+        border-color: #dc2626 !important;
+        color: white !important;
+    }
     </style>
     """,
     unsafe_allow_html=True,
@@ -182,7 +188,7 @@ if mode == "User panel":
                 f"Please enter {extra_labels[st.session_state.predicted_label]}"
             )
 
-            if st.button("Submit Complaint"):
+            if st.button("Submit Complaint", type="primary"):
                 if not extra_info.strip():
                     st.warning("This field is required.")
                 else:
@@ -225,3 +231,4 @@ else:
             st.dataframe(df, width="stretch")
 
         st.markdown("</div>", unsafe_allow_html=True)
+
