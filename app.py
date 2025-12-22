@@ -65,9 +65,9 @@ st.markdown(
         font-size: 13px;
         margin-top: 6px;
     }
-     /* Target only the "Submit Complaint" button */
+    /* Hover effect for Submit Complaint */
     button:has(span:contains("Submit Complaint")):hover {
-        background-color: #dc2626 !important; /* red */
+        background-color: #dc2626 !important;
         border-color: #dc2626 !important;
         color: white !important;
     }
@@ -113,12 +113,18 @@ def rule_override_label(text: str, model_label: str, conf: Optional[float]):
         return model_label
     return best
 
-# ---------------- Inference ----------------
+# ---------------- Inference (FIXED) ----------------
 def get_reply(text: str):
     if pipeline is None:
-        return None
+        return {
+            "method": "error",
+            "label": "unknown",
+            "reply": "Model not loaded correctly.",
+            "confidence": None,
+        }
 
     pred = pipeline.predict([text])[0]
+
     try:
         conf = float(np.max(pipeline.predict_proba([text])[0]))
     except Exception:
@@ -134,7 +140,12 @@ def get_reply(text: str):
         "technical": "Thanks for telling us — we understand. Our technical team will look into this issue.",
     }
 
-    return label, replies[label], conf
+    return {
+        "method": "classifier",
+        "label": label,
+        "reply": replies.get(label),
+        "confidence": conf,
+    }
 
 # ---------------- History ----------------
 if "history" not in st.session_state:
@@ -146,7 +157,6 @@ if "history" not in st.session_state:
 # ---------------- Sidebar ----------------
 mode = st.sidebar.radio("View as", ["User panel", "Admin panel"], index=0)
 
-
 # ================= USER PANEL =================
 if mode == "User panel":
     with st.container():
@@ -154,8 +164,7 @@ if mode == "User panel":
 
         st.markdown("<div class='main-title'>Complaint Auto Reply Generator</div>", unsafe_allow_html=True)
         st.markdown(
-            "<div class='subtitle'>Enter your complaint. "
-            "We will provide a quick and helpful response.</div>",
+            "<div class='subtitle'>Enter your complaint. We will provide a quick and helpful response.</div>",
             unsafe_allow_html=True,
         )
 
@@ -173,38 +182,50 @@ if mode == "User panel":
             else:
                 result = get_reply(complaint.strip())
 
-                st.markdown("<div class='section-title'>Suggested response</div>", unsafe_allow_html=True)
-                st.markdown(
-                    f"<div class='reply-box'>We received your complaint related to "
-                    f"<b>{result['label']}</b> :-<br>{result['reply']}</div>",
-                    unsafe_allow_html=True,
-                )
-
-                # -------- Additional Info Box --------
-                extra_placeholders = {
-                    "billing": "e.g. Billing ID: BILL-2024-1098",
-                    "product": "e.g. Order ID: ORD-458921",
-                    "delivery": "e.g. Tracking ID: TRK-992134",
-                    "account": "e.g. Registered email or username",
-                    "technical": "e.g. Android 13, App version 2.4.1",
-                }
-
-                extra_info = st.text_input(
-                    "Additional information (required)",
-                    placeholder=extra_placeholders.get(
-                        result["label"],
-                        "Enter relevant reference details"
+                if result["method"] == "error":
+                    st.error(result["reply"])
+                else:
+                    st.markdown("<div class='section-title'>Suggested response</div>", unsafe_allow_html=True)
+                    st.markdown(
+                        f"<div class='reply-box'>We received your complaint related to "
+                        f"<b>{result['label']}</b> :-<br>{result['reply']}</div>",
+                        unsafe_allow_html=True,
                     )
-                )
 
-                if st.button("Submit Complaint", type="primary"):
-                    st.success(
-                        "Thank you for submitting your complaint. "
-                        "Our team will review the details and resolve your issue as soon as possible."
+                    # -------- Additional Info Box --------
+                    extra_placeholders = {
+                        "billing": "e.g. Billing ID: BILL-2024-1098",
+                        "product": "e.g. Order ID: ORD-458921",
+                        "delivery": "e.g. Tracking ID: TRK-992134",
+                        "account": "e.g. Registered email or username",
+                        "technical": "e.g. Android 13, App version 2.4.1",
+                    }
+
+                    extra_info = st.text_input(
+                        "Additional information (required)",
+                        placeholder=extra_placeholders.get(
+                            result["label"], "Enter relevant reference details"
+                        )
                     )
+
+                    if st.button("Submit Complaint", type="primary"):
+                        record = {
+                            "time": time.strftime("%Y-%m-%d %H:%M:%S"),
+                            "complaint": complaint.strip(),
+                            "label": result["label"],
+                            "confidence": result["confidence"],
+                            "extra_info": extra_info,
+                        }
+
+                        st.session_state.history.append(record)
+                        pd.DataFrame(st.session_state.history).to_csv(HISTORY_CSV, index=False)
+
+                        st.success(
+                            "Thank you for submitting your complaint. "
+                            "Our team will review the details and resolve your issue as soon as possible."
+                        )
 
         st.markdown("</div>", unsafe_allow_html=True)
-
 
 # ================= ADMIN PANEL =================
 else:
@@ -217,7 +238,12 @@ else:
         else:
             df = pd.DataFrame(st.session_state.history)
 
-            counts = df["label"].value_counts().reindex(ALL_LABELS, fill_value=0).reset_index()
+            counts = (
+                df["label"]
+                .value_counts()
+                .reindex(ALL_LABELS, fill_value=0)
+                .reset_index()
+            )
             counts.columns = ["label", "count"]
             counts["percentage"] = (counts["count"] / counts["count"].sum() * 100).round(1)
 
@@ -231,7 +257,3 @@ else:
             st.dataframe(df, width="stretch")
 
         st.markdown("</div>", unsafe_allow_html=True)
-
-
-
-
