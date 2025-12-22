@@ -1,4 +1,4 @@
-# app.py – Clean complaint UI with User/Admin panels, dashboard, history, rules + CSV persistence
+# app.py – Complaint Auto Reply Generator (STABLE VERSION)
 
 import time
 from pathlib import Path
@@ -8,23 +8,21 @@ import joblib
 import numpy as np
 import pandas as pd
 import streamlit as st
-from sklearn.metrics.pairwise import cosine_similarity
 import altair as alt
 
-# ---------------- Page config ----------------
+# ---------------- Page Config ----------------
 st.set_page_config(
-    page_title="Complaint Auto-Responder",
+    page_title="Complaint Auto Reply Generator",
     layout="centered",
 )
 
-# ---------------- Paths (GitHub ROOT) ----------------
-PIPELINE_PATH = Path("pipeline_calibrated.joblib")
-BANK_PATH = Path("complaint_bank.pkl")
-SBERT_META_PATH = Path("sbert_meta.joblib")
-BANK_EMB_PATH = Path("embeddings_full.npy")
-HISTORY_CSV = Path("complaint_history.csv")
+# ---------------- Paths (GitHub-safe) ----------------
+BASE_DIR = Path(__file__).parent
 
-# ---------------- Light UI styling ----------------
+PIPELINE_PATH = BASE_DIR / "pipeline_calibrated.joblib"
+HISTORY_CSV = BASE_DIR / "complaint_history.csv"
+
+# ---------------- UI Styling (UNCHANGED) ----------------
 st.markdown(
     """
     <style>
@@ -73,188 +71,198 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# ---------------- Cached loaders ----------------
+# ---------------- Load ML Pipeline ----------------
 @st.cache_resource(show_spinner=False)
 def load_pipeline(path: Path):
     if not path.exists():
         return None
+
     obj = joblib.load(path)
-
-    # Handle dict-based joblib
-    if isinstance(obj, dict):
-        if "pipeline" in obj:
-            return obj["pipeline"]
-        if "model" in obj:
-            return obj["model"]
-        return None
-
+    if isinstance(obj, dict) and "pipeline" in obj:
+        return obj["pipeline"]
     return obj
 
 
-@st.cache_resource(show_spinner=False)
-def load_bank(path: Path) -> Optional[List[Dict]]:
-    if not path.exists():
-        return None
-    return joblib.load(path)
-
-
-@st.cache_resource(show_spinner=False)
-def load_sbert():
-    try:
-        from sentence_transformers import SentenceTransformer
-    except Exception:
-        return None
-
-    model_name = "all-MiniLM-L6-v2"
-    if SBERT_META_PATH.exists():
-        meta = joblib.load(SBERT_META_PATH)
-        model_name = meta.get("sbert_model_name", model_name)
-
-    return SentenceTransformer(model_name)
-
-
 pipeline = load_pipeline(PIPELINE_PATH)
-bank = load_bank(BANK_PATH)
-sbert = load_sbert()
-bank_embs = np.load(BANK_EMB_PATH) if BANK_EMB_PATH.exists() else None
 
-# ---------------- Rule-based overrides ----------------
+# ---------------- Rule-based Keywords ----------------
 LABEL_KEYWORDS = {
-    "delivery": ["delivery", "courier", "parcel", "late delivery"],
-    "billing": ["refund", "billing", "charged", "payment"],
-    "product": ["damaged", "broken", "wrong product", "defective"],
+    "delivery": ["delivery", "courier", "parcel", "not delivered", "late delivery"],
+    "billing": ["refund", "billing", "charged", "payment", "invoice"],
+    "product": ["damaged", "broken", "defective", "wrong product"],
     "account": ["login", "password", "otp", "account"],
-    "technical": ["bug", "error", "crash", "not working"],
+    "technical": ["app", "error", "crash", "bug", "not working"],
 }
 
-def rule_override_label(text: str, model_label: str, conf: Optional[float]) -> str:
-    t = text.lower()
+
+def rule_override_label(text: str, model_label: str, conf: Optional[float]):
+    text = text.lower()
     scores = {k: 0 for k in LABEL_KEYWORDS}
-    for label, keys in LABEL_KEYWORDS.items():
-        for k in keys:
-            if k in t:
+
+    for label, words in LABEL_KEYWORDS.items():
+        for w in words:
+            if w in text:
                 scores[label] += 1
 
     best = max(scores, key=scores.get)
     if scores[best] == 0:
         return model_label
-    if conf and conf >= 0.8:
+
+    if conf is not None and conf >= 0.80:
         return model_label
+
     return best
 
 
-# ---------------- Core inference ----------------
-def get_reply(text: str, sim_threshold: float = 0.65):
-    # Retrieval
-    if (
-    sbert is not None
-    and bank is not None
-    and bank_embs is not None
-    and len(bank) == len(bank_embs)
-    and len(bank) > 0
-):
-    q = sbert.encode([text], convert_to_numpy=True)
-    sims = cosine_similarity(q, bank_embs)[0]
-    idx = int(np.argmax(sims))
-
-    if sims[idx] >= sim_threshold:
-        m = bank[idx]
+# ---------------- Core Inference (FIXED) ----------------
+def get_reply(text: str):
+    if pipeline is None:
         return {
-            "method": "retrieval",
-            "label": m.get("label", "unknown"),
-            "reply": m.get("reply", ""),
-            "confidence": float(sims[idx]),
+            "method": "error",
+            "label": "unknown",
+            "reply": "Model not loaded correctly.",
+            "confidence": None,
         }
 
-
-    if pipeline is None:
-        return {"method": "error", "message": "Model not loaded correctly."}
-
     pred = pipeline.predict([text])[0]
+
     try:
-        conf = float(np.max(pipeline.predict_proba([text])[0]))
+        probs = pipeline.predict_proba([text])[0]
+        conf = float(np.max(probs))
     except Exception:
         conf = None
 
     final_label = rule_override_label(text, pred, conf)
 
-    default_replies = {
-        "billing": "We understand your billing concern and will resolve it shortly.",
-        "delivery": "We are checking the delivery issue and will update you soon.",
-        "product": "We have noted the product issue and will assist you.",
-        "account": "We will resolve your account-related issue shortly.",
-        "technical": "Our technical team is working on this issue.",
+    replies = {
+        "billing": "Thanks for telling us — we understand. We'll check your billing issue and update you soon.",
+        "delivery": "Thanks for telling us — we understand. We'll investigate the delivery issue and update you soon.",
+        "product": "Thanks for telling us — we understand. We'll review the product issue and resolve it shortly.",
+        "account": "Thanks for telling us — we understand. We'll assist you with your account issue shortly.",
+        "technical": "Thanks for telling us — we understand. Our technical team will look into this issue.",
     }
+
+    reply = replies.get(
+        final_label,
+        "Thanks for telling us — we understand. We'll look into this and update you soon.",
+    )
 
     return {
         "method": "classifier",
         "label": final_label,
-        "reply": default_replies.get(final_label, "We will look into this issue."),
+        "reply": reply,
         "confidence": conf,
     }
 
 
-# ---------------- Persistent history ----------------
+# ---------------- Persistent History ----------------
 if "history" not in st.session_state:
     if HISTORY_CSV.exists():
-        st.session_state["history"] = pd.read_csv(HISTORY_CSV).to_dict("records")
+        st.session_state.history = pd.read_csv(HISTORY_CSV).to_dict("records")
     else:
-        st.session_state["history"] = []
+        st.session_state.history = []
+
 
 # ---------------- Sidebar ----------------
-mode = st.sidebar.radio("View as", ["User panel", "Admin panel"])
+mode = st.sidebar.radio("View as", ["User panel", "Admin panel"], index=0)
 
 st.sidebar.markdown("---")
-st.sidebar.write("Pipeline loaded:", pipeline is not None)
-st.sidebar.write("Bank loaded:", bank is not None)
-st.sidebar.write("SBERT loaded:", sbert is not None)
-st.sidebar.write("Bank embeddings:", bank_embs is not None)
+st.sidebar.write("Model loaded:", pipeline is not None)
 
-# ---------------- USER PANEL ----------------
+# ================= USER PANEL =================
 if mode == "User panel":
     with st.container():
         st.markdown("<div class='main-card'>", unsafe_allow_html=True)
-        st.markdown("<div class='main-title'>Complaint Auto-Responder</div>", unsafe_allow_html=True)
-        st.markdown("<div class='subtitle'>Submit your complaint and get an instant response.</div>", unsafe_allow_html=True)
+        st.markdown("<div class='main-title'>Complaint Auto Reply Generator</div>", unsafe_allow_html=True)
+        st.markdown(
+            "<div class='subtitle'>Enter your complaint related to our services. "
+            "We will provide a quick and helpful response.</div>",
+            unsafe_allow_html=True,
+        )
 
-        complaint = st.text_area("Enter the complaint", height=150)
+        st.markdown("<div class='section-title'>Enter the complaint</div>", unsafe_allow_html=True)
+        complaint = st.text_area(
+            "Complaint",
+            height=150,
+            placeholder="Example: The delivery boy asked me to collect the product from office.",
+        )
+
         if st.button("Submit", type="primary"):
-            if complaint.strip():
-                result = get_reply(complaint.strip())
-                if result.get("method") == "error":
-                    st.error(result["message"])
+            if not complaint.strip():
+                st.warning("Please enter a complaint.")
+            else:
+                with st.spinner("Analyzing complaint..."):
+                    start = time.time()
+                    result = get_reply(complaint.strip())
+                    elapsed = time.time() - start
+
+                if result["method"] == "error":
+                    st.error(result["reply"])
                 else:
                     record = {
                         "time": time.strftime("%Y-%m-%d %H:%M:%S"),
-                        "complaint": complaint,
+                        "complaint": complaint.strip(),
                         "label": result["label"],
                         "method": result["method"],
                         "confidence": result["confidence"],
                         "reply": result["reply"],
                     }
-                    st.session_state["history"].append(record)
-                    pd.DataFrame([record]).to_csv(
-                        HISTORY_CSV,
-                        mode="a",
-                        header=not HISTORY_CSV.exists(),
-                        index=False,
+
+                    st.session_state.history.append(record)
+                    pd.DataFrame(st.session_state.history).to_csv(
+                        HISTORY_CSV, index=False
                     )
 
-                    st.markdown("<div class='reply-box'>"
-                                f"We received your complaint related to <b>{result['label']}</b>:<br>{result['reply']}"
-                                "</div>", unsafe_allow_html=True)
+                    st.markdown("<div class='section-title'>Suggested response</div>", unsafe_allow_html=True)
+                    st.markdown(
+                        f"<div class='reply-box'>We received your complaint related to "
+                        f"<b>{result['label']}</b> :-<br>{result['reply']}</div>",
+                        unsafe_allow_html=True,
+                    )
+
+                    meta = []
+                    if result["confidence"] is not None:
+                        meta.append(f"Confidence: {result['confidence']:.2f}")
+                    meta.append(f"Generated in {elapsed:.2f}s")
+
+                    st.markdown(
+                        "<div class='meta-text'>" + " • ".join(meta) + "</div>",
+                        unsafe_allow_html=True,
+                    )
+
         st.markdown("</div>", unsafe_allow_html=True)
 
-# ---------------- ADMIN PANEL ----------------
+# ================= ADMIN PANEL =================
 else:
     with st.container():
         st.markdown("<div class='main-card'>", unsafe_allow_html=True)
         st.markdown("<div class='main-title'>Admin Panel</div>", unsafe_allow_html=True)
+        st.markdown(
+            "<div class='subtitle'>Statistics and history of processed complaints.</div>",
+            unsafe_allow_html=True,
+        )
 
-        if not st.session_state["history"]:
-            st.info("No complaints yet.")
+        history = st.session_state.history
+
+        if not history:
+            st.info("No complaints processed yet.")
         else:
-            df = pd.DataFrame(st.session_state["history"])
-            st.dataframe(df, width="stretch")
-        st.markdown("</div>", unsafe_allow_html=True)
+            df = pd.DataFrame(history)
 
+            st.markdown("<div class='section-title'>Complaint Dashboard</div>", unsafe_allow_html=True)
+            st.write(f"Total complaints: **{len(df)}**")
+
+            counts = df["label"].value_counts().reset_index()
+            counts.columns = ["label", "count"]
+
+            chart = alt.Chart(counts).mark_arc().encode(
+                theta="count",
+                color="label",
+                tooltip=["label", "count"],
+            )
+            st.altair_chart(chart, width="stretch")
+
+            st.markdown("<div class='section-title'>Complaint History</div>", unsafe_allow_html=True)
+            st.dataframe(df, width="stretch")
+
+        st.markdown("</div>", unsafe_allow_html=True)
