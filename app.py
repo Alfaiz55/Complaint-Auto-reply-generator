@@ -146,7 +146,7 @@ if "history" not in st.session_state:
 # ---------------- Sidebar ----------------
 mode = st.sidebar.radio("View as", ["User panel", "Admin panel"], index=0)
 
-# ================= USER PANEL =================
+
 # ================= USER PANEL =================
 if mode == "User panel":
     with st.container():
@@ -154,7 +154,7 @@ if mode == "User panel":
 
         st.markdown("<div class='main-title'>Complaint Auto Reply Generator</div>", unsafe_allow_html=True)
         st.markdown(
-            "<div class='subtitle'>Enter your complaint related to our services. "
+            "<div class='subtitle'>Enter your complaint. "
             "We will provide a quick and helpful response.</div>",
             unsafe_allow_html=True,
         )
@@ -231,6 +231,7 @@ else:
             st.dataframe(df, width="stretch")
 
         st.markdown("</div>", unsafe_allow_html=True)
+
 
 
 
