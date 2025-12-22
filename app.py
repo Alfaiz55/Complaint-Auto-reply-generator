@@ -151,7 +151,24 @@ if mode == "User panel":
     with st.container():
         st.markdown("<div class='main-card'>", unsafe_allow_html=True)
         st.markdown("<div class='main-title'>Complaint Auto Reply Generator</div>", unsafe_allow_html=True)
-        st.markdown("<div class='subtitle'>Enter your complaint related to our services.</div>", unsafe_allow_html=True)
+        st.markdown("<div class='subtitle'>Enter your complaint.</div>", unsafe_allow_html=True)
+        # -------- Additional Info Box (category-wise) --------
+extra_placeholders = {
+    "billing": "e.g. Billing ID: BILL-2024-1098",
+    "product": "e.g. Order ID: ORD-458921",
+    "delivery": "e.g. Tracking ID: TRK-992134",
+    "account": "e.g. Registered email or username",
+    "technical": "e.g. Android 13, App version 2.4.1",
+}
+
+extra_info = st.text_input(
+    "Additional information (required)",
+    placeholder=extra_placeholders.get(
+        result["label"],
+        "Enter relevant reference details"
+    )
+)
+
 
         complaint = st.text_area("Complaint", height=150)
 
@@ -231,4 +248,5 @@ else:
             st.dataframe(df, width="stretch")
 
         st.markdown("</div>", unsafe_allow_html=True)
+
 
