@@ -1,4 +1,4 @@
-# app.py – Complaint Auto Reply Generator (User/Admin with Login)
+# app.py – Complaint Auto Reply Generator (User/Admin separated)
 
 import time
 from pathlib import Path
@@ -8,8 +8,8 @@ import joblib
 import numpy as np
 import pandas as pd
 import streamlit as st
-from sklearn.metrics.pairwise import cosine_similarity
 import altair as alt
+from sklearn.metrics.pairwise import cosine_similarity
 
 # ---------------- Page Config ----------------
 st.set_page_config(
@@ -19,57 +19,94 @@ st.set_page_config(
 
 # ---------------- Paths ----------------
 BASE_DIR = Path(__file__).parent
-
-PIPELINE_PATH   = BASE_DIR / "pipeline_calibrated.joblib"
-BANK_PATH       = BASE_DIR / "complaint_bank.pkl"
+PIPELINE_PATH = BASE_DIR / "pipeline_calibrated.joblib"
+BANK_PATH = BASE_DIR / "complaint_bank.pkl"
 SBERT_META_PATH = BASE_DIR / "sbert_meta.joblib"
-BANK_EMB_PATH   = BASE_DIR / "bank_embeddings.npy"
-HISTORY_CSV     = BASE_DIR / "complaint_history.csv"
+BANK_EMB_PATH = BASE_DIR / "bank_embeddings.npy"
+HISTORY_CSV = BASE_DIR / "complaint_history.csv"
 
-# ---------------- UI Styling ----------------
-st.markdown("""
-<style>
-.stApp { background-color: #f3f6fb; }
-.card {
-    background: white;
-    padding: 22px;
-    border-radius: 12px;
-    box-shadow: 0 4px 14px rgba(0,0,0,0.08);
-}
-.title { font-size: 26px; font-weight: 700; }
-.subtitle { color: #6b7280; margin-bottom: 16px; }
-.reply-box {
-    background: #e0f2fe;
-    border: 1px solid #93c5fd;
-    padding: 14px;
-    border-radius: 8px;
-    margin-top: 10px;
-}
-</style>
-""", unsafe_allow_html=True)
+# ---------------- Styling ----------------
+st.markdown(
+    """
+    <style>
+    .stApp { background-color:#f3f6fb; }
+
+    .main-card {
+        background:#ffffff;
+        padding:22px;
+        border-radius:12px;
+        box-shadow:0 4px 14px rgba(15,23,42,0.08);
+        margin-top:20px;
+    }
+
+    .moto {
+        background:#2563eb;
+        color:white;
+        padding:14px;
+        border-radius:10px;
+        text-align:center;
+        font-size:20px;
+        font-weight:600;
+        margin-bottom:20px;
+    }
+
+    .subtitle {
+        color:#6b7280;
+        font-size:14px;
+        margin-bottom:18px;
+    }
+
+    .section-title {
+        font-size:18px;
+        font-weight:600;
+        margin-top:12px;
+        margin-bottom:6px;
+        color:#111827;
+    }
+
+    .reply-box {
+        background:#e0f2fe;
+        border:1px solid #93c5fd;
+        color:#0f172a;
+        padding:14px;
+        border-radius:8px;
+        margin-top:10px;
+        font-size:15px;
+    }
+
+    .meta-text {
+        font-size:13px;
+        color:#6b7280;
+        margin-top:6px;
+    }
+
+    .center-btn {
+        display:flex;
+        justify-content:center;
+        gap:20px;
+        margin-top:20px;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
 # ---------------- Loaders ----------------
-@st.cache_resource(show_spinner=False)
-def load_pipeline(path: Path):
-    if not path.exists():
-        return None
-    obj = joblib.load(path)
-    return obj["pipeline"] if isinstance(obj, dict) else obj
-
-@st.cache_resource(show_spinner=False)
-def load_bank(path: Path):
+@st.cache_resource
+def load_pipeline(path):
     return joblib.load(path) if path.exists() else None
 
-@st.cache_resource(show_spinner=False)
+@st.cache_resource
+def load_bank(path):
+    return joblib.load(path) if path.exists() else None
+
+@st.cache_resource
 def load_sbert():
     try:
         from sentence_transformers import SentenceTransformer
-        name = "all-MiniLM-L6-v2"
-        if SBERT_META_PATH.exists():
-            meta = joblib.load(SBERT_META_PATH)
-            name = meta.get("sbert_model_name", name)
-        return SentenceTransformer(name)
-    except Exception:
+        meta = joblib.load(SBERT_META_PATH)
+        return SentenceTransformer(meta.get("sbert_model_name"))
+    except:
         return None
 
 pipeline = load_pipeline(PIPELINE_PATH)
@@ -77,22 +114,32 @@ bank = load_bank(BANK_PATH)
 sbert = load_sbert()
 bank_embs = np.load(BANK_EMB_PATH) if BANK_EMB_PATH.exists() else None
 
+# ---------------- Session ----------------
+if "page" not in st.session_state:
+    st.session_state.page = "select"
+
+if "history" not in st.session_state:
+    if HISTORY_CSV.exists():
+        st.session_state.history = pd.read_csv(HISTORY_CSV).to_dict("records")
+    else:
+        st.session_state.history = []
+
 # ---------------- Label Rules ----------------
 LABEL_KEYWORDS = {
-    "delivery": ["delivery", "courier", "parcel", "not delivered"],
-    "billing": ["refund", "charged", "payment", "invoice"],
-    "product": ["damaged", "broken", "wrong product", "defective"],
-    "account": ["login", "password", "otp", "account"],
-    "technical": ["error", "crash", "bug", "not working"],
+    "delivery": ["delivery", "courier", "parcel", "not delivered", "delivery boy"],
+    "billing": ["charged", "refund", "payment", "invoice"],
+    "product": ["damaged", "broken", "wrong product", "quality"],
+    "account": ["login", "password", "account", "otp"],
+    "technical": ["crash", "error", "not working", "bug"],
 }
 
-def rule_override(text, label, conf):
+def rule_override(text, pred):
     t = text.lower()
-    scores = {k: sum(kw in t for kw in v) for k, v in LABEL_KEYWORDS.items()}
-    best = max(scores, key=scores.get)
-    if scores[best] > 0 and (conf is None or conf < 0.8):
-        return best
-    return label
+    for label, kws in LABEL_KEYWORDS.items():
+        for k in kws:
+            if k in t:
+                return label
+    return pred
 
 # ---------------- Inference ----------------
 def get_reply(text):
@@ -101,132 +148,129 @@ def get_reply(text):
         sims = cosine_similarity(q, bank_embs)[0]
         idx = int(np.argmax(sims))
         if sims[idx] >= 0.65:
-            m = bank[idx]
-            return m["label"], m["reply"], "retrieval", float(sims[idx])
+            b = bank[idx]
+            return b["label"], b["reply"], "retrieval", sims[idx]
 
     pred = pipeline.predict([text])[0]
-    try:
-        conf = float(np.max(pipeline.predict_proba([text])[0]))
-    except:
-        conf = None
-
-    label = rule_override(text, pred, conf)
+    final = rule_override(text, pred)
 
     replies = {
         "delivery": "We understand your delivery concern. Our team will investigate and update you shortly.",
-        "billing": "We understand the billing issue and will resolve it as soon as possible.",
-        "product": "We acknowledge the product issue and will take necessary action.",
-        "account": "We are reviewing your account-related concern and will update you.",
-        "technical": "Our technical team is looking into the issue.",
+        "billing": "We understand the billing issue. Our billing team will review and get back to you.",
+        "product": "We understand the product issue. We will arrange a resolution as soon as possible.",
+        "account": "We understand your account problem. Our support team will assist you shortly.",
+        "technical": "We understand the technical issue. Our engineers are checking this.",
     }
 
-    return label, replies.get(label, "We have received your complaint."), "classifier", conf
+    return final, replies.get(final), "classifier", None
 
-# ---------------- Session Init ----------------
-if "role" not in st.session_state:
-    st.session_state.role = None
+# ================= PAGE 1: SELECTION =================
+if st.session_state.page == "select":
+    st.markdown("<div class='main-card'>", unsafe_allow_html=True)
+    st.markdown("<div class='moto'>Complain here — we provide quick and reliable services</div>", unsafe_allow_html=True)
+    st.markdown("<div class='subtitle'>Choose how you want to continue</div>", unsafe_allow_html=True)
 
-# ---------------- LOGIN PAGE ----------------
-if st.session_state.role is None:
-    with st.container():
-        st.markdown("<div class='card'>", unsafe_allow_html=True)
-        st.markdown("<div class='title'>Complaint Auto Reply Generator</div>", unsafe_allow_html=True)
-        st.markdown("<div class='subtitle'>Select your access type</div>", unsafe_allow_html=True)
+    col1, col2 = st.columns(2)
+    if col1.button("User", use_container_width=True):
+        st.session_state.page = "user"
+        st.rerun()
 
-        col1, col2 = st.columns(2)
+    if col2.button("Admin", use_container_width=True):
+        st.session_state.page = "admin_login"
+        st.rerun()
 
-        if col1.button("User"):
-            st.session_state.role = "user"
-            st.experimental_rerun()
+    st.markdown("</div>", unsafe_allow_html=True)
 
-        if col2.button("Admin"):
-            st.session_state.role = "admin_login"
-            st.experimental_rerun()
+# ================= PAGE 2: ADMIN LOGIN =================
+elif st.session_state.page == "admin_login":
+    st.markdown("<div class='main-card'>", unsafe_allow_html=True)
+    st.markdown("<div class='moto'>Admin Login</div>", unsafe_allow_html=True)
 
-        st.markdown("</div>", unsafe_allow_html=True)
+    u = st.text_input("Username")
+    p = st.text_input("Password", type="password")
 
-# ---------------- ADMIN LOGIN ----------------
-elif st.session_state.role == "admin_login":
-    with st.container():
-        st.markdown("<div class='card'>", unsafe_allow_html=True)
-        st.markdown("<div class='title'>Admin Login</div>", unsafe_allow_html=True)
-
-        u = st.text_input("Username")
-        p = st.text_input("Password", type="password")
-
-        if st.button("Login"):
-            if u == "admin" and p == "0000":
-                st.session_state.role = "admin"
-                st.experimental_rerun()
-            else:
-                st.error("Invalid credentials")
-
-        st.markdown("</div>", unsafe_allow_html=True)
-
-# ---------------- USER PANEL ----------------
-elif st.session_state.role == "user":
-    with st.container():
-        st.markdown("<div class='card'>", unsafe_allow_html=True)
-        st.markdown("<div class='title'>Submit Your Complaint</div>", unsafe_allow_html=True)
-
-        complaint = st.text_area("Complaint", height=150)
-
-        if st.button("Submit Complaint"):
-            if complaint.strip():
-                label, reply, method, conf = get_reply(complaint)
-
-                record = {
-                    "time": time.strftime("%Y-%m-%d %H:%M:%S"),
-                    "complaint": complaint,
-                    "label": label,
-                    "method": method,
-                    "confidence": conf,
-                }
-
-                df = pd.DataFrame([record])
-                df.to_csv(HISTORY_CSV, mode="a", index=False, header=not HISTORY_CSV.exists())
-
-                st.markdown(f"<div class='reply-box'><b>Related to:</b> {label}<br>{reply}</div>", unsafe_allow_html=True)
-
-        st.markdown("</div>", unsafe_allow_html=True)
-
-# ---------------- ADMIN PANEL ----------------
-elif st.session_state.role == "admin":
-    with st.container():
-        st.markdown("<div class='card'>", unsafe_allow_html=True)
-        st.markdown("<div class='title'>Admin Dashboard</div>", unsafe_allow_html=True)
-
-        if not HISTORY_CSV.exists():
-            st.info("No complaints yet.")
+    if st.button("Login", use_container_width=True):
+        if u == "admin" and p == "0000":
+            st.session_state.page = "admin"
+            st.rerun()
         else:
-            df = pd.read_csv(HISTORY_CSV)
+            st.error("Invalid admin credentials")
 
-            st.write(f"Total complaints: **{len(df)}**")
+    st.markdown("</div>", unsafe_allow_html=True)
 
-            counts = df["label"].value_counts().reset_index()
-            counts.columns = ["label", "count"]
-            counts["percentage"] = (counts["count"] / counts["count"].sum() * 100).round(2)
+# ================= PAGE 3: USER =================
+elif st.session_state.page == "user":
+    st.markdown("<div class='main-card'>", unsafe_allow_html=True)
+    st.markdown("<div class='moto'>Submit Your Complaint</div>", unsafe_allow_html=True)
 
-            chart = alt.Chart(counts).mark_arc().encode(
+    complaint = st.text_area("Enter your complaint", height=150)
+
+    if st.button("Submit", use_container_width=True):
+        if complaint.strip():
+            label, reply, method, conf = get_reply(complaint)
+
+            record = {
+                "time": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "complaint": complaint,
+                "label": label,
+                "method": method,
+                "confidence": conf,
+                "reply": reply,
+            }
+
+            st.session_state.history.append(record)
+            pd.DataFrame([record]).to_csv(
+                HISTORY_CSV,
+                mode="a",
+                index=False,
+                header=not HISTORY_CSV.exists(),
+            )
+
+            st.markdown(
+                f"<div class='reply-box'>We received your complaint related to <b>{label}</b> :-<br>{reply}</div>",
+                unsafe_allow_html=True,
+            )
+
+            st.markdown(
+                "<div class='meta-text'>Thank you for contacting us. We appreciate your patience.</div>",
+                unsafe_allow_html=True,
+            )
+        else:
+            st.warning("Please enter a complaint")
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+# ================= PAGE 4: ADMIN =================
+elif st.session_state.page == "admin":
+    st.markdown("<div class='main-card'>", unsafe_allow_html=True)
+    st.markdown("<div class='moto'>Admin Dashboard</div>", unsafe_allow_html=True)
+
+    df = pd.DataFrame(st.session_state.history)
+
+    if df.empty:
+        st.info("No complaints available")
+    else:
+        counts = df["label"].value_counts().reset_index()
+        counts.columns = ["label", "count"]
+        counts["percentage"] = (counts["count"] / counts["count"].sum() * 100).round(2)
+
+        chart = (
+            alt.Chart(counts)
+            .mark_arc()
+            .encode(
                 theta="count",
                 color=alt.Color("label", legend=alt.Legend(orient="left")),
-                tooltip=["label", "count", "percentage"]
+                tooltip=["label", "count", "percentage"],
             )
+        )
 
-            text = alt.Chart(counts).mark_text(radius=120).encode(
-                theta="count",
-                text=alt.Text("percentage:Q", format=".0f")
-            )
+        st.altair_chart(chart, use_container_width=True)
+        st.dataframe(df, use_container_width=True)
 
-            st.altair_chart(chart + text, use_container_width=True)
+        st.download_button(
+            "Download Complaint CSV",
+            df.to_csv(index=False),
+            file_name="complaint_history.csv",
+        )
 
-            st.dataframe(df, use_container_width=True)
-
-            st.download_button(
-                "Download CSV",
-                df.to_csv(index=False),
-                file_name="complaint_history.csv",
-                mime="text/csv"
-            )
-
-        st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
