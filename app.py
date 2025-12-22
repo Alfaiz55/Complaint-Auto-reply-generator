@@ -146,18 +146,26 @@ def rule_override_label(text: str, model_label: str, conf: Optional[float]) -> s
 # ---------------- Core inference ----------------
 def get_reply(text: str, sim_threshold: float = 0.65):
     # Retrieval
-    if sbert and bank and bank_embs is not None:
-        q = sbert.encode([text], convert_to_numpy=True)
-        sims = cosine_similarity(q, bank_embs)[0]
-        idx = int(np.argmax(sims))
-        if sims[idx] >= sim_threshold:
-            m = bank[idx]
-            return {
-                "method": "retrieval",
-                "label": m["label"],
-                "reply": m["reply"],
-                "confidence": float(sims[idx]),
-            }
+    if (
+    sbert is not None
+    and bank is not None
+    and bank_embs is not None
+    and len(bank) == len(bank_embs)
+    and len(bank) > 0
+):
+    q = sbert.encode([text], convert_to_numpy=True)
+    sims = cosine_similarity(q, bank_embs)[0]
+    idx = int(np.argmax(sims))
+
+    if sims[idx] >= sim_threshold:
+        m = bank[idx]
+        return {
+            "method": "retrieval",
+            "label": m.get("label", "unknown"),
+            "reply": m.get("reply", ""),
+            "confidence": float(sims[idx]),
+        }
+
 
     if pipeline is None:
         return {"method": "error", "message": "Model not loaded correctly."}
@@ -249,3 +257,4 @@ else:
             df = pd.DataFrame(st.session_state["history"])
             st.dataframe(df, width="stretch")
         st.markdown("</div>", unsafe_allow_html=True)
+
