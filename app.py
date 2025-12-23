@@ -175,7 +175,6 @@ if "history" not in st.session_state:
 mode = st.sidebar.radio("View as", ["User panel", "Admin panel"])
 
 # ================= USER PANEL =================
-# ================= USER PANEL =================
 if mode == "User panel":
 
     st.markdown("<div class='main-card'>", unsafe_allow_html=True)
@@ -237,11 +236,23 @@ if mode == "User panel":
                     "extra_info": extra_info,
                 }
 
-                st.session_state.history.append(record)
-                pd.DataFrame(st.session_state.history).to_csv(HISTORY_CSV, index=False)
+                # Always treat CSV as source of truth
+if HISTORY_CSV.exists():
+    df_existing = pd.read_csv(HISTORY_CSV)
+else:
+    df_existing = pd.DataFrame()
 
-                st.success("Thank you. Your complaint has been registered successfully.")
-                del st.session_state.result
+# Append new record
+df_updated = pd.concat([df_existing, pd.DataFrame([record])], ignore_index=True)
+
+# Save back to CSV
+df_updated.to_csv(HISTORY_CSV, index=False)
+
+# Refresh session_state from CSV
+st.session_state.history = df_updated.to_dict("records")
+
+st.success("Thank you. Your complaint has been registered successfully.")
+del st.session_state.result
 
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -274,6 +285,7 @@ else:
             st.dataframe(df_display, width="stretch", hide_index=True)
 
         st.markdown("</div>", unsafe_allow_html=True)
+
 
 
 
