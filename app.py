@@ -25,55 +25,36 @@ HISTORY_CSV = BASE_DIR / "complaint_history.csv"
 st.markdown(
     """
     <style>
+        .stApp {
+            background-color: #f3f6fb;
+        }
 
-    /* ---------------- App Background ---------------- */
-    .stApp {
-        background:
-            radial-gradient(circle at 20% 10%, rgba(56,189,248,0.08), transparent 40%),
-            radial-gradient(circle at 80% 20%, rgba(34,211,238,0.08), transparent 45%),
-            linear-gradient(180deg, #020617, #020617);
-        color: #e5e7eb;
-        font-family: "Segoe UI", system-ui, sans-serif;
-    }
+        .main-card {
+            background: #ffffff;
+            padding: 20px 22px;
+            border-radius: 12px;
+            box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+        }
 
-    /* ---------------- Top Banner ---------------- */
-    header {
-        background: rgba(2, 6, 23, 0.85);
-        backdrop-filter: blur(12px);
-        border-bottom: 1px solid rgba(56, 189, 248, 0.25);
-        box-shadow: 0 10px 40px rgba(2, 6, 23, 0.9);
-    }
+        .main-title {
+            font-size: 28px;
+            font-weight: 700;
+            color: #0f172a;
+        }
 
+        .subtitle {
+            color: #6b7280;
+            font-size: 14px;
+            margin-bottom: 18px;
+        }
 
-
-    /* ---------------- Main Card ---------------- */
-    .main-card {
-        background: rgba(15, 23, 42, 0.78);
-        backdrop-filter: blur(16px);
-        border: 1px solid rgba(148, 163, 184, 0.18);
-        padding: 28px 30px;
-        border-radius: 18px;
-        box-shadow:
-            0 0 0 1px rgba(56, 189, 248, 0.08),
-            0 20px 50px rgba(2, 6, 23, 0.95);
-    }
-
-    /* ---------------- Title ---------------- */
-    .main-title {
-        font-size: 28px;
-        font-weight: 600;
-        color: #e0f2fe;
-        margin-bottom: 6px;
-    }
-
-    .subtitle {
-        color: #94a3b8;
-        font-size: 14px;
-        margin-bottom: 20px;
-    }
-
-    /* ---------------- Feature Badges ---------------- */
-    .badge-row {
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #111827;
+            margin-top: 12px;
+        }
+           .badge-row {
         display: flex;
         gap: 10px;
         margin-bottom: 18px;
@@ -91,68 +72,25 @@ st.markdown(
         box-shadow: inset 0 0 10px rgba(56, 189, 248, 0.15);
     }
 
-    /* ---------------- Section Title ---------------- */
-    .section-title {
-        font-size: 17px;
-        font-weight: 600;
-        color: #bae6fd;
-        margin-top: 14px;
-        margin-bottom: 6px;
-    }
-
-    /* ---------------- Text Area ---------------- */
-    textarea {
-        background: rgba(2, 6, 23, 0.9) !important;
-        color: #e5e7eb !important;
-        border: 1px solid rgba(56, 189, 248, 0.35) !important;
-        border-radius: 12px !important;
-        box-shadow: inset 0 0 18px rgba(56, 189, 248, 0.15);
-    }
-
-    textarea::placeholder {
-        color: #64748b !important;
-    }
-
-    /* ---------------- Reply Box ---------------- */
-    .reply-box {
-        background: linear-gradient(
-            160deg,
-            rgba(14, 165, 233, 0.14),
-            rgba(2, 132, 199, 0.08)
-        );
-        border: 1px solid rgba(56, 189, 248, 0.4);
-        color: #e5e7eb;
-        padding: 16px;
-        border-radius: 14px;
-        font-size: 15px;
-        line-height: 1.6;
-        box-shadow:
-            inset 0 0 22px rgba(56, 189, 248, 0.18),
-            0 10px 30px rgba(2, 6, 23, 0.8);
-        margin-top: 10px;
-    }
-
-    /* ---------------- Submit Button (UNCHANGED) ---------------- */
-    .stButton button {
-        background: linear-gradient(135deg, #0ea5e9, #38bdf8);
-        color: #020617;
-        font-weight: 600;
-        border-radius: 10px;
-        padding: 8px 18px;
-        border: none;
-        box-shadow: 0 6px 20px rgba(56, 189, 248, 0.35);
-        transition: all 0.2s ease;
-    }
-
-    .stButton button:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 10px 28px rgba(56, 189, 248, 0.55);
-    }
-
+        .reply-box {
+            background: #e0f2fe;
+            border: 1px solid #93c5fd;
+            color: #0f172a;
+            padding: 14px;
+            border-radius: 8px;
+            font-size: 15px;
+            margin-top: 8px;
+        }
     </style>
     """,
     unsafe_allow_html=True,
 )
+
+
+  
+ 
+
+   
 st.markdown("""
 <div class="badge-row">
     <div class="badge">Product</div>
@@ -336,6 +274,7 @@ else:
             st.dataframe(df_display, width="stretch", hide_index=True)
 
         st.markdown("</div>", unsafe_allow_html=True)
+
 
 
 
