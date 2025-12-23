@@ -237,67 +237,76 @@ if "history" not in st.session_state:
 mode = st.sidebar.radio("View as", ["User panel", "Admin panel"])
 
 # ================= USER PANEL =================
+# ================= USER PANEL =================
 if mode == "User panel":
-        st.markdown("<div class='main-card'>", unsafe_allow_html=True)
 
-        st.markdown("<div class='main-title'>Complaint Auto Reply Generator</div>", unsafe_allow_html=True)
-        st.markdown("<div class='subtitle'>Submit your complaint and get quick assistance.</div>", unsafe_allow_html=True)
+    st.markdown("<div class='main-card'>", unsafe_allow_html=True)
 
-        complaint = st.text_area(
-            "Enter your complaint",
-            height=150,
-            placeholder="Example: The delivery boy asked me to collect the product from office.",
+    st.markdown(
+        "<div class='main-title'>Complaint Auto Reply Generator</div>",
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        "<div class='subtitle'>Submit your complaint and get quick assistance.</div>",
+        unsafe_allow_html=True,
+    )
+
+    complaint = st.text_area(
+        "Enter your complaint",
+        height=150,
+        placeholder="Example: The delivery boy asked me to collect the product from office.",
+    )
+
+    if st.button("Submit", type="primary"):
+        if not complaint.strip():
+            st.warning("Please enter a complaint.")
+        else:
+            st.session_state.result = get_reply(complaint.strip())
+            st.session_state.complaint_text = complaint.strip()
+
+    if "result" in st.session_state and not st.session_state.result["error"]:
+        r = st.session_state.result
+
+        st.markdown("<div class='section-title'>Suggested response</div>", unsafe_allow_html=True)
+        st.markdown(
+            f"<div class='reply-box'>Complaint category: <b>{r['label']}</b><br>{r['reply']}</div>",
+            unsafe_allow_html=True,
         )
 
-        if st.button("Submit", type="primary"):
-            if not complaint.strip():
-                st.warning("Please enter a complaint.")
+        placeholders = {
+            "billing": "e.g. BILL-2024-1098",
+            "product": "e.g. ORD-458921",
+            "delivery": "e.g. TRK-992134",
+            "account": "e.g. registered email",
+            "technical": "e.g. Android 13, App v2.4.1",
+        }
+
+        extra_info = st.text_input(
+            "Additional information (required)",
+            placeholder=placeholders[r["label"]],
+        )
+
+        if st.button("Submit Complaint"):
+            if not extra_info.strip():
+                st.warning("Please provide the required information.")
             else:
-                st.session_state.result = get_reply(complaint.strip())
-                st.session_state.complaint_text = complaint.strip()
+                record = {
+                    "time": time.strftime("%Y-%m-%d %H:%M:%S"),
+                    "complaint": st.session_state.complaint_text,
+                    "label": r["label"],
+                    "confidence": r["confidence"],
+                    "reply": r["reply"],
+                    "extra_info": extra_info,
+                }
 
-        if "result" in st.session_state and not st.session_state.result["error"]:
-            r = st.session_state.result
+                st.session_state.history.append(record)
+                pd.DataFrame(st.session_state.history).to_csv(HISTORY_CSV, index=False)
 
-            st.markdown("<div class='section-title'>Suggested response</div>", unsafe_allow_html=True)
-            st.markdown(
-                f"<div class='reply-box'>Complaint category: <b>{r['label']}</b><br>{r['reply']}</div>",
-                unsafe_allow_html=True,
-            )
+                st.success("Thank you. Your complaint has been registered successfully.")
+                del st.session_state.result
 
-            placeholders = {
-                "billing": "e.g. BILL-2024-1098",
-                "product": "e.g. ORD-458921",
-                "delivery": "e.g. TRK-992134",
-                "account": "e.g. registered email",
-                "technical": "e.g. Android 13, App v2.4.1",
-            }
+    st.markdown("</div>", unsafe_allow_html=True)
 
-            extra_info = st.text_input(
-                "Additional information (required)",
-                placeholder=placeholders[r["label"]],
-            )
-
-            if st.button("Submit Complaint"):
-                if not extra_info.strip():
-                    st.warning("Please provide the required information.")
-                else:
-                    record = {
-                        "time": time.strftime("%Y-%m-%d %H:%M:%S"),
-                        "complaint": st.session_state.complaint_text,
-                        "label": r["label"],
-                        "confidence": r["confidence"],
-                        "reply": r["reply"],          # ✅ FIXED: reply is now saved
-                        "extra_info": extra_info,
-                    }
-
-                    st.session_state.history.append(record)
-                    pd.DataFrame(st.session_state.history).to_csv(HISTORY_CSV, index=False)
-
-                    st.success("Thank you. Your complaint has been registered successfully.")
-                    del st.session_state.result
-
-        st.markdown("</div>", unsafe_allow_html=True)
 
 # ================= ADMIN PANEL =================
 else:
@@ -327,6 +336,7 @@ else:
             st.dataframe(df_display, width="stretch", hide_index=True)
 
         st.markdown("</div>", unsafe_allow_html=True)
+
 
 
 
