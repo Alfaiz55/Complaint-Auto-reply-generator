@@ -204,7 +204,10 @@ if mode == "User panel":
     if "result" in st.session_state and not st.session_state.result["error"]:
         r = st.session_state.result
 
-        st.markdown("<div class='section-title'>Suggested response</div>", unsafe_allow_html=True)
+        st.markdown(
+            "<div class='section-title'>Suggested response</div>",
+            unsafe_allow_html=True
+        )
         st.markdown(
             f"<div class='reply-box'>Complaint category: <b>{r['label']}</b><br>{r['reply']}</div>",
             unsafe_allow_html=True,
@@ -237,24 +240,28 @@ if mode == "User panel":
                 }
 
                 # Always treat CSV as source of truth
-if HISTORY_CSV.exists():
-    df_existing = pd.read_csv(HISTORY_CSV)
-else:
-    df_existing = pd.DataFrame()
+                if HISTORY_CSV.exists():
+                    df_existing = pd.read_csv(HISTORY_CSV)
+                else:
+                    df_existing = pd.DataFrame()
 
-# Append new record
-df_updated = pd.concat([df_existing, pd.DataFrame([record])], ignore_index=True)
+                df_updated = pd.concat(
+                    [df_existing, pd.DataFrame([record])],
+                    ignore_index=True
+                )
 
-# Save back to CSV
-df_updated.to_csv(HISTORY_CSV, index=False)
+                df_updated.to_csv(HISTORY_CSV, index=False)
 
-# Refresh session_state from CSV
-st.session_state.history = df_updated.to_dict("records")
+                # Refresh session state
+                st.session_state.history = df_updated.to_dict("records")
 
-st.success("Thank you. Your complaint has been registered successfully.")
-del st.session_state.result
+                st.success(
+                    "Thank you. Your complaint has been registered successfully."
+                )
+                del st.session_state.result
 
     st.markdown("</div>", unsafe_allow_html=True)
+
 
 
 # ================= ADMIN PANEL =================
@@ -285,6 +292,7 @@ else:
             st.dataframe(df_display, width="stretch", hide_index=True)
 
         st.markdown("</div>", unsafe_allow_html=True)
+
 
 
 
