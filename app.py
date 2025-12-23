@@ -68,7 +68,7 @@ st.markdown(
         font-weight: 500;
         background: rgba(56, 189, 248, 0.12);
         border: 1px solid rgba(56, 189, 248, 0.35);
-        color: #bae6fd;
+        color: #0f172a;
         box-shadow: inset 0 0 10px rgba(56, 189, 248, 0.15);
     }
 
@@ -274,6 +274,7 @@ else:
             st.dataframe(df_display, width="stretch", hide_index=True)
 
         st.markdown("</div>", unsafe_allow_html=True)
+
 
 
 
