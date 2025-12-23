@@ -44,18 +44,7 @@ st.markdown(
         box-shadow: 0 10px 40px rgba(2, 6, 23, 0.9);
     }
 
-    header::after {
-        content: "🤖  AI Complaint Response System";
-        display: block;
-        text-align: center;
-        padding: 14px 0;
-        font-size: 22px;
-        font-weight: 700;
-        letter-spacing: 0.7px;
-        background: linear-gradient(90deg, #38bdf8, #22d3ee);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-    }
+
 
     /* ---------------- Main Card ---------------- */
     .main-card {
@@ -339,6 +328,7 @@ else:
             st.dataframe(df_display, width="stretch", hide_index=True)
 
         st.markdown("</div>", unsafe_allow_html=True)
+
 
 
 
