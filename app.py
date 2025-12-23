@@ -238,7 +238,7 @@ mode = st.sidebar.radio("View as", ["User panel", "Admin panel"])
 
 # ================= USER PANEL =================
 if mode == "User panel":
-    st.markdown("<div class='main-card'>", unsafe_allow_html=True)
+        st.markdown("<div class='main-card'>", unsafe_allow_html=True)
 
         st.markdown("<div class='main-title'>Complaint Auto Reply Generator</div>", unsafe_allow_html=True)
         st.markdown("<div class='subtitle'>Submit your complaint and get quick assistance.</div>", unsafe_allow_html=True)
@@ -327,6 +327,7 @@ else:
             st.dataframe(df_display, width="stretch", hide_index=True)
 
         st.markdown("</div>", unsafe_allow_html=True)
+
 
 
 
