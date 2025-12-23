@@ -25,80 +25,125 @@ HISTORY_CSV = BASE_DIR / "complaint_history.csv"
 st.markdown(
     """
     <style>
-    /* App background */
+
+    /* ---------------- App Background ---------------- */
     .stApp {
-        background: radial-gradient(circle at top, #0f172a, #020617);
+        background:
+            radial-gradient(circle at 20% 10%, rgba(56,189,248,0.08), transparent 40%),
+            radial-gradient(circle at 80% 20%, rgba(34,211,238,0.08), transparent 45%),
+            linear-gradient(180deg, #020617, #020617);
         color: #e5e7eb;
         font-family: "Segoe UI", system-ui, sans-serif;
     }
 
-    /* Main container card */
-    .main-card {
-        background: rgba(15, 23, 42, 0.75);
-        backdrop-filter: blur(14px);
-        -webkit-backdrop-filter: blur(14px);
-        border: 1px solid rgba(148, 163, 184, 0.15);
-        padding: 26px 28px;
-        border-radius: 16px;
-        box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.08),
-                    0 12px 40px rgba(2, 6, 23, 0.9);
+    /* ---------------- Top Banner ---------------- */
+    header {
+        background: rgba(2, 6, 23, 0.85);
+        backdrop-filter: blur(12px);
+        border-bottom: 1px solid rgba(56, 189, 248, 0.25);
+        box-shadow: 0 10px 40px rgba(2, 6, 23, 0.9);
     }
 
-    /* Main title */
-    .main-title {
-        font-size: 30px;
+    header::after {
+        content: "🤖  AI Complaint Response System";
+        display: block;
+        text-align: center;
+        padding: 14px 0;
+        font-size: 22px;
         font-weight: 700;
-        color: #e0f2fe;
-        letter-spacing: 0.4px;
-        margin-bottom: 4px;
+        letter-spacing: 0.7px;
+        background: linear-gradient(90deg, #38bdf8, #22d3ee);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
     }
 
-    /* Subtitle */
-    .subtitle {
-        color: #94a3b8;
-        font-size: 14px;
-        margin-bottom: 22px;
+    /* ---------------- Main Card ---------------- */
+    .main-card {
+        background: rgba(15, 23, 42, 0.78);
+        backdrop-filter: blur(16px);
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        padding: 28px 30px;
+        border-radius: 18px;
+        box-shadow:
+            0 0 0 1px rgba(56, 189, 248, 0.08),
+            0 20px 50px rgba(2, 6, 23, 0.95);
     }
 
-    /* Section headings */
-    .section-title {
-        font-size: 18px;
+    /* ---------------- Title ---------------- */
+    .main-title {
+        font-size: 28px;
         font-weight: 600;
-        color: #bae6fd;
-        margin-top: 16px;
+        color: #e0f2fe;
         margin-bottom: 6px;
     }
 
-    /* Complaint reply output box */
-    .reply-box {
-        background: linear-gradient(
-            145deg,
-            rgba(14, 165, 233, 0.12),
-            rgba(2, 132, 199, 0.08)
-        );
-        border: 1px solid rgba(56, 189, 248, 0.35);
-        color: #e5e7eb;
-        padding: 16px;
-        border-radius: 12px;
-        font-size: 15px;
-        line-height: 1.55;
-        box-shadow: inset 0 0 18px rgba(56, 189, 248, 0.15);
-        margin-top: 10px;
+    .subtitle {
+        color: #94a3b8;
+        font-size: 14px;
+        margin-bottom: 20px;
     }
 
-    /* Text area (complaint input) */
+    /* ---------------- Feature Badges ---------------- */
+    .badge-row {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 18px;
+        flex-wrap: wrap;
+    }
+
+    .badge {
+        padding: 6px 12px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 500;
+        background: rgba(56, 189, 248, 0.12);
+        border: 1px solid rgba(56, 189, 248, 0.35);
+        color: #bae6fd;
+        box-shadow: inset 0 0 10px rgba(56, 189, 248, 0.15);
+    }
+
+    /* ---------------- Section Title ---------------- */
+    .section-title {
+        font-size: 17px;
+        font-weight: 600;
+        color: #bae6fd;
+        margin-top: 14px;
+        margin-bottom: 6px;
+    }
+
+    /* ---------------- Text Area ---------------- */
     textarea {
         background: rgba(2, 6, 23, 0.9) !important;
         color: #e5e7eb !important;
-        border: 1px solid rgba(148, 163, 184, 0.3) !important;
-        border-radius: 10px !important;
+        border: 1px solid rgba(56, 189, 248, 0.35) !important;
+        border-radius: 12px !important;
+        box-shadow: inset 0 0 18px rgba(56, 189, 248, 0.15);
     }
 
     textarea::placeholder {
         color: #64748b !important;
     }
 
-    /* Submit button */
+    /* ---------------- Reply Box ---------------- */
+    .reply-box {
+        background: linear-gradient(
+            160deg,
+            rgba(14, 165, 233, 0.14),
+            rgba(2, 132, 199, 0.08)
+        );
+        border: 1px solid rgba(56, 189, 248, 0.4);
+        color: #e5e7eb;
+        padding: 16px;
+        border-radius: 14px;
+        font-size: 15px;
+        line-height: 1.6;
+        box-shadow:
+            inset 0 0 22px rgba(56, 189, 248, 0.18),
+            0 10px 30px rgba(2, 6, 23, 0.8);
+        margin-top: 10px;
+    }
+
+    /* ---------------- Submit Button (UNCHANGED) ---------------- */
     .stButton button {
         background: linear-gradient(135deg, #0ea5e9, #38bdf8);
         color: #020617;
@@ -114,10 +159,21 @@ st.markdown(
         transform: translateY(-1px);
         box-shadow: 0 10px 28px rgba(56, 189, 248, 0.55);
     }
+
     </style>
     """,
     unsafe_allow_html=True,
 )
+st.markdown("""
+<div class="badge-row">
+    <div class="badge">Product</div>
+    <div class="badge">Account</div>
+    <div class="badge">Billing</div>
+    <div class="badge">Technical</div>
+    <div class="badge">Delivery</div>
+</div>
+""", unsafe_allow_html=True)
+
 
 
 # ---------------- Load Model ----------------
@@ -283,6 +339,7 @@ else:
             st.dataframe(df_display, width="stretch", hide_index=True)
 
         st.markdown("</div>", unsafe_allow_html=True)
+
 
 
 
