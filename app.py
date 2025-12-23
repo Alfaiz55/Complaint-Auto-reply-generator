@@ -25,42 +25,100 @@ HISTORY_CSV = BASE_DIR / "complaint_history.csv"
 st.markdown(
     """
     <style>
-    .stApp { background-color: #f3f6fb; }
+    /* App background */
+    .stApp {
+        background: radial-gradient(circle at top, #0f172a, #020617);
+        color: #e5e7eb;
+        font-family: "Segoe UI", system-ui, sans-serif;
+    }
+
+    /* Main container card */
     .main-card {
-        background: #ffffff;
-        padding: 20px 22px;
-        border-radius: 12px;
-        box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+        background: rgba(15, 23, 42, 0.75);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        border: 1px solid rgba(148, 163, 184, 0.15);
+        padding: 26px 28px;
+        border-radius: 16px;
+        box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.08),
+                    0 12px 40px rgba(2, 6, 23, 0.9);
     }
+
+    /* Main title */
     .main-title {
-        font-size: 28px;
+        font-size: 30px;
         font-weight: 700;
-        color: #0f172a;
+        color: #e0f2fe;
+        letter-spacing: 0.4px;
+        margin-bottom: 4px;
     }
+
+    /* Subtitle */
     .subtitle {
-        color: #6b7280;
+        color: #94a3b8;
         font-size: 14px;
-        margin-bottom: 18px;
+        margin-bottom: 22px;
     }
+
+    /* Section headings */
     .section-title {
         font-size: 18px;
         font-weight: 600;
-        color: #111827;
-        margin-top: 12px;
+        color: #bae6fd;
+        margin-top: 16px;
+        margin-bottom: 6px;
     }
+
+    /* Complaint reply output box */
     .reply-box {
-        background: #e0f2fe;
-        border: 1px solid #93c5fd;
-        color: #0f172a;
-        padding: 14px;
-        border-radius: 8px;
+        background: linear-gradient(
+            145deg,
+            rgba(14, 165, 233, 0.12),
+            rgba(2, 132, 199, 0.08)
+        );
+        border: 1px solid rgba(56, 189, 248, 0.35);
+        color: #e5e7eb;
+        padding: 16px;
+        border-radius: 12px;
         font-size: 15px;
-        margin-top: 8px;
+        line-height: 1.55;
+        box-shadow: inset 0 0 18px rgba(56, 189, 248, 0.15);
+        margin-top: 10px;
+    }
+
+    /* Text area (complaint input) */
+    textarea {
+        background: rgba(2, 6, 23, 0.9) !important;
+        color: #e5e7eb !important;
+        border: 1px solid rgba(148, 163, 184, 0.3) !important;
+        border-radius: 10px !important;
+    }
+
+    textarea::placeholder {
+        color: #64748b !important;
+    }
+
+    /* Submit button */
+    .stButton button {
+        background: linear-gradient(135deg, #0ea5e9, #38bdf8);
+        color: #020617;
+        font-weight: 600;
+        border-radius: 10px;
+        padding: 8px 18px;
+        border: none;
+        box-shadow: 0 6px 20px rgba(56, 189, 248, 0.35);
+        transition: all 0.2s ease;
+    }
+
+    .stButton button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 10px 28px rgba(56, 189, 248, 0.55);
     }
     </style>
     """,
     unsafe_allow_html=True,
 )
+
 
 # ---------------- Load Model ----------------
 @st.cache_resource(show_spinner=False)
@@ -225,5 +283,6 @@ else:
             st.dataframe(df_display, width="stretch", hide_index=True)
 
         st.markdown("</div>", unsafe_allow_html=True)
+
 
 
